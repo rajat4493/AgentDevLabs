@@ -2,5 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* you can add global styles below */
-html, body { height: 100%; }
+/* optional: base styles */
+html, body {
+  height: 100%;
+}

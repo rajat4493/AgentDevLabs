@@ -1,0 +1,18 @@
+# Node
+node_modules
+**/node_modules
+.next
+out
+dist
+npm-debug.log*
+yarn-error.log*
+
+# OS/IDE
+.DS_Store
+.vscode
+.idea
+node_modules
+**/node_modules
+.next
+out
+dist
