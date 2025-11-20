@@ -1,27 +1,19 @@
 # Node
 node_modules
-**/node_modules
 .next
-out
 dist
+out
 npm-debug.log*
 yarn-error.log*
 
-# OS/IDE
-.DS_Store
-.vscode
-.idea
-node_modules
-**/node_modules
-.next
-out
-dist
-# .gitignore
-node_modules/
+# Turbo / Next artifacts (if any)
+.ui
+.turbo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv
 .env
-.env.local
-.next
-dist
-build
-*.log
-.DS_Store
+.env.*
