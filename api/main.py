@@ -2,6 +2,11 @@ import os
 import time
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from analytics.store import metrics_store
+from fastapi.middleware.cors import CORSMiddleware  # NEW
+
+
+
 
 from shared.models import (
     RunRequest, RunResponse, Provenance, PolicyEvaluation,
@@ -27,6 +32,22 @@ MODEL_BY_BAND = {
 }
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
+
+app.add_middleware(                                # NEW
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/v1/metrics/summary")
+def metrics_summary():
+    """
+    Aggregate router metrics for the dashboard.
+    """
+    snapshot = metrics_store.snapshot()
+    return JSONResponse(snapshot)
 
 @app.get("/health")
 def health():
