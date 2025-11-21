@@ -1,39 +1,51 @@
 import os
-import time
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from analytics.store import metrics_store
-from fastapi.middleware.cors import CORSMiddleware  # NEW
-
-
-
+from fastapi.middleware.cors import CORSMiddleware
 
 from shared.models import (
-    RunRequest, RunResponse, Provenance, PolicyEvaluation,
-    AuditInfo, MetricsInfo, MetricsSnapshot
+    RunRequest,
+    RunResponse,
+    Provenance,
+    PolicyEvaluation,
+    AuditInfo,
+    MetricsInfo,
+    MetricsSnapshot,
 )
 from router import new_run_id, compute_alri_tag, evaluate_policy
 from router.complexity import score_complexity, choose_band
 from analytics.store import metrics_store
 from logger import log_event
+from providers import PROVIDERS
 
-# ---- Provider selection ----
-PROVIDER = os.getenv("PROVIDER", "ollama").lower()
-if PROVIDER == "ollama":
-    from providers import ollama_adapter as provider_impl
-else:
-    from providers import stub as provider_impl
 
-# ---- Model mapping by complexity band ----
-MODEL_BY_BAND = {
-    "simple":  os.getenv("MODEL_SIMPLE",  "llama3"),
-    "moderate":os.getenv("MODEL_MODERATE","qwen2:7b-instruct"),
-    "complex": os.getenv("MODEL_COMPLEX","qwen2:7b-instruct"),
+def _env(name: str, default: str) -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    value = value.strip()
+    return value if value else default
+
+# ---- Band-based routing config ----
+# Defaults are OpenAI; can be overridden via env vars.
+BAND_ROUTING = {
+    "simple": {
+        "provider": _env("PROVIDER_SIMPLE", _env("PROVIDER_DEFAULT", "openai")).lower(),
+        "model": _env("MODEL_SIMPLE", "gpt-4o-mini"),
+    },
+    "moderate": {
+        "provider": _env("PROVIDER_MODERATE", _env("PROVIDER_DEFAULT", "openai")).lower(),
+        "model": _env("MODEL_MODERATE", "gpt-4o"),
+    },
+    "complex": {
+        "provider": _env("PROVIDER_COMPLEX", _env("PROVIDER_DEFAULT", "openai")).lower(),
+        "model": _env("MODEL_COMPLEX", "gpt-4o"),
+    },
 }
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
 
-app.add_middleware(                                # NEW
+app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
     allow_credentials=True,
@@ -54,8 +66,7 @@ def health():
     return {
         "ok": True,
         "service": "agenticlabs-api",
-        "provider": PROVIDER,
-        "models": MODEL_BY_BAND
+        "routing": BAND_ROUTING,
     }
 
 @app.post("/v1/run", response_model=RunResponse)
@@ -76,19 +87,29 @@ def run_endpoint(payload: RunRequest):
     if force_band in {"simple", "moderate", "complex"}:
         cband = force_band
 
-    chosen_model = force_model or MODEL_BY_BAND.get(cband) or MODEL_BY_BAND["moderate"]
+    route_cfg = BAND_ROUTING.get(cband) or BAND_ROUTING["moderate"]
+    provider_name = route_cfg["provider"]
+    model_name = force_model or route_cfg["model"]
+
+    if provider_name not in PROVIDERS:
+        provider_name = "openai"
+
+    provider_impl = PROVIDERS.get(provider_name)
+    if provider_impl is None:
+        raise ValueError(f"Provider '{provider_name}' is not configured")
 
     log_event("route_complexity", {
         "run_id": rid,
         "score": round(cscore, 3),
         "band": cband,
-        "model": chosen_model,
+        "provider": provider_name,
+        "model": model_name,
         "force_model": bool(force_model),
         "force_band": bool(force_band)
     })
 
     # ---- Plan + Execute ----
-    plan = provider_impl.plan(payload.model_dump(), model_name=chosen_model)
+    plan = provider_impl.plan(payload.model_dump(), model_name=model_name)
     log_event("route_plan", {"run_id": rid, "plan": plan})
 
     result = provider_impl.execute(plan, payload.prompt)
