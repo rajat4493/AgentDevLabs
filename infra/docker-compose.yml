@@ -30,15 +30,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgres://agentic:agenticpass@postgres:5432/agenticlabs
+      - DATABASE_URL=postgresql+psycopg2://agentic:agenticpass@postgres:5432/agenticlabs
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PROVIDER_SIMPLE=${PROVIDER_SIMPLE}
-      - MODEL_SIMPLE=${MODEL_SIMPLE}
-      - PROVIDER_MODERATE=${PROVIDER_MODERATE}
-      - MODEL_MODERATE=${MODEL_MODERATE}
-      - PROVIDER_COMPLEX=${PROVIDER_COMPLEX}
-      - MODEL_COMPLEX=${MODEL_COMPLEX}
+      - PROVIDER_SIMPLE=${PROVIDER_SIMPLE:-openai}
+      - MODEL_SIMPLE=${MODEL_SIMPLE:-gpt-4o-mini}
+      - PROVIDER_MODERATE=${PROVIDER_MODERATE:-openai}
+      - MODEL_MODERATE=${MODEL_MODERATE:-gpt-4o}
+      - PROVIDER_COMPLEX=${PROVIDER_COMPLEX:-openai}
+      - MODEL_COMPLEX=${MODEL_COMPLEX:-gpt-4o}
     depends_on:
       - postgres
       - redis

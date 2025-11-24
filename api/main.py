@@ -1,24 +1,26 @@
 import os
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from shared.models import (
+    AuditInfo,
+    MetricsInfo,
     RunRequest,
     RunResponse,
     Provenance,
     PolicyEvaluation,
-    AuditInfo,
-    MetricsInfo,
-    MetricsSnapshot,
 )
-from router import new_run_id, compute_alri_tag, evaluate_policy
-from router.complexity import score_complexity, choose_band
-from analytics.store import metrics_store
+from router import compute_alri_tag, evaluate_policy, new_run_id
+from router.complexity import choose_band, score_complexity
 from logger import log_event
 from providers import PROVIDERS
 from pricing import calc_baseline_cost
 from routes import logs
+from db.models import Base
+from db.router_runs_repo import get_summary, list_runs as list_runs_repo, log_run
+from db.session import engine, get_db
 
 
 def _env(name: str, default: str) -> str:
@@ -46,6 +48,7 @@ BAND_ROUTING = {
 }
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,12 +61,12 @@ app.add_middleware(
 app.include_router(logs.router)
 
 @app.get("/v1/metrics/summary")
-def metrics_summary():
+def metrics_summary(db: Session = Depends(get_db)):
     """
     Aggregate router metrics for the dashboard.
     """
-    snapshot = metrics_store.snapshot()
-    return JSONResponse(snapshot)
+    summary = get_summary(db)
+    return JSONResponse(summary)
 
 @app.get("/health")
 def health():
@@ -74,7 +77,7 @@ def health():
     }
 
 @app.post("/v1/run", response_model=RunResponse)
-def run_endpoint(payload: RunRequest):
+def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     rid = new_run_id()
     log_event("router_in", {"run_id": rid, "agent_id": payload.agent_id})
 
@@ -150,7 +153,9 @@ def run_endpoint(payload: RunRequest):
     else:
         baseline_cost = result["cost_usd"]
 
-    metrics_store.add_run(
+    log_run(
+        db,
+
         band=cband,
         provider=provider_name,
         model=model_name,
@@ -175,8 +180,3 @@ def run_endpoint(payload: RunRequest):
 
     log_event("router_out", {"run_id": rid, "status": resp.status})
     return JSONResponse(resp.model_dump())
-
-@app.get("/v1/metrics", response_model=MetricsSnapshot)
-def metrics():
-    snap = metrics_store.snapshot()
-    return JSONResponse(snap)
