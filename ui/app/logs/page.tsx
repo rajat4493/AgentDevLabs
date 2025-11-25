@@ -142,6 +142,69 @@ export default function LogsPage() {
       sortKey === key ? "text-emerald-300" : ""
     }`;
 
+  const handleExportCsv = () => {
+    if (!sortedItems.length) return;
+    const headers = [
+      "id",
+      "timestamp",
+      "band",
+      "provider",
+      "model",
+      "latency_ms",
+      "router_latency_ms",
+      "provider_latency_ms",
+      "processing_latency_ms",
+      "prompt_tokens",
+      "completion_tokens",
+      "cost_usd",
+      "baseline_cost_usd",
+      "savings_usd",
+      "alri_score",
+      "alri_tier",
+    ];
+    const rows = sortedItems.map((row) => [
+      row.id,
+      new Date(row.timestamp * 1000).toISOString(),
+      row.band,
+      row.provider,
+      row.model,
+      row.latency_ms,
+      row.router_latency_ms ?? "",
+      row.provider_latency_ms ?? "",
+      row.processing_latency_ms ?? "",
+      row.prompt_tokens,
+      row.completion_tokens,
+      row.cost_usd,
+      row.baseline_cost_usd,
+      row.savings_usd,
+      row.alri_score ?? "",
+      row.alri_tier ?? "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((cols) =>
+        cols
+          .map((value) => {
+            if (value === null || value === undefined) return "";
+            const str = String(value);
+            if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          })
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `agenticlabs-logs-${offset}-${offset + sortedItems.length}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const SortIcon = ({ column }: { column: string }) => (
     <button
       onClick={() => handleSort(column)}
@@ -196,9 +259,16 @@ export default function LogsPage() {
           <section className="rounded-2xl border border-slate-800 bg-slate-900/60">
             <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-3 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Showing {sortedItems.length} of {data?.total ?? 0} runs
+                Showing {sortedItems.length} of {data?.total ?? 0} runs (50 per page)
               </span>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportCsv}
+                  disabled={!sortedItems.length}
+                  className="rounded-full border border-slate-700 px-3 py-1 text-xs disabled:opacity-40"
+                >
+                  Export CSV
+                </button>
                 {sortKey && (
                   <span className="text-[11px] uppercase tracking-wide text-emerald-300">
                     Sorted by {sortKey} ({sortDir})
