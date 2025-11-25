@@ -30,7 +30,12 @@ def score_complexity(prompt: str) -> float:
     score = (0.45 * f_len) + (0.15 * f_digits) + (0.1 * f_symbols) + f_code + f_json + (0.2 * f_sent) + f_kw
     return max(0.0, min(score, 1.0))
 
-def choose_band(score: float) -> str:
+LONG_CONTEXT_CHAR_THRESHOLD = 4000
+
+
+def choose_band(score: float, prompt: str | None = None) -> str:
+    if prompt and len(prompt) >= LONG_CONTEXT_CHAR_THRESHOLD:
+        return "long_context"
     if score < 0.25:
         return "simple"
     if score < 0.6:

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from . import ollama_adapter
 from . import stub
+from .anthropic_adapter import anthropic_adapter
+from .gemini_adapter import gemini_adapter
 
 try:
     from . import openai_adapter
@@ -16,6 +18,8 @@ except ImportError:  # pragma: no cover - optional dependency guard
 
 PROVIDERS = {
     "ollama": ollama_adapter,
+    "anthropic": anthropic_adapter,
+    "gemini": gemini_adapter,
     "stub": stub,
 }
 

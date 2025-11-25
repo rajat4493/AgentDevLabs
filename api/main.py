@@ -17,7 +17,7 @@ from router import compute_alri_tag, evaluate_policy, new_run_id
 from router.complexity import choose_band, score_complexity
 from logger import log_event
 from providers import PROVIDERS
-from pricing import calc_baseline_cost
+from costs import compute_costs
 from governance.alri import compute_alri_v2
 from routes import logs
 from db.models import Base
@@ -44,8 +44,12 @@ BAND_ROUTING = {
         "model": _env("MODEL_MODERATE", "gpt-4o"),
     },
     "complex": {
-        "provider": _env("PROVIDER_COMPLEX", _env("PROVIDER_DEFAULT", "openai")).lower(),
-        "model": _env("MODEL_COMPLEX", "gpt-4o"),
+        "provider": _env("PROVIDER_COMPLEX", _env("PROVIDER_DEFAULT", "anthropic")).lower(),
+        "model": _env("MODEL_COMPLEX", "claude-3-opus-20240229"),
+    },
+    "long_context": {
+        "provider": _env("PROVIDER_LONG_CONTEXT", _env("PROVIDER_DEFAULT", "gemini")).lower(),
+        "model": _env("MODEL_LONG_CONTEXT", "gemini-1.5-flash"),
     },
 }
 
@@ -86,7 +90,7 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
 
     # ---- Smart routing (with manual override) ----
     cscore = score_complexity(payload.prompt)
-    cband = choose_band(cscore)
+    cband = choose_band(cscore, payload.prompt)
 
     force_model = None
     force_band = None
@@ -94,7 +98,7 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
         force_model = payload.policy_overrides.get("force_model")
         force_band = payload.policy_overrides.get("force_band")
 
-    if force_band in {"simple", "moderate", "complex"}:
+    if force_band in {"simple", "moderate", "complex", "long_context"}:
         cband = force_band
 
     route_cfg = BAND_ROUTING.get(cband) or BAND_ROUTING["moderate"]
@@ -126,10 +130,33 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     t_provider_start = time.perf_counter()
     result = provider_impl.execute(plan, payload.prompt)
     t_provider_end = time.perf_counter()
+
+    prompt_tokens = result.get("prompt_tokens")
+    if prompt_tokens is None:
+        prompt_tokens = (result.get("provenance") or {}).get("input_tokens", 0)
+    completion_tokens = result.get("completion_tokens")
+    if completion_tokens is None:
+        completion_tokens = (result.get("provenance") or {}).get("output_tokens", 0)
+
+    prompt_tokens = int(prompt_tokens or 0)
+    completion_tokens = int(completion_tokens or 0)
+
+    computed_cost, baseline_cost = compute_costs(
+        provider=provider_name,
+        model=model_name,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    cost_usd = computed_cost if computed_cost > 0 else float(result.get("cost_usd", 0.0))
+    if baseline_cost <= 0:
+        baseline_cost = cost_usd if cost_usd > 0 else float(result.get("cost_usd", 0.0))
+
+    result["cost_usd"] = cost_usd
+
     log_event("provider_out", {
         "run_id": rid,
         "latency_ms": result["latency_ms"],
-        "cost_usd": result["cost_usd"]
+        "cost_usd": cost_usd,
     })
 
     # ---- Policy evaluation ----
@@ -143,22 +170,6 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     alri_tag = compute_alri_tag(ctx.get("risk_band"), ctx.get("jurisdiction"))
 
     # ---- Metrics ----
-    prompt_tokens = result.get("prompt_tokens")
-    if prompt_tokens is None:
-        prompt_tokens = (result.get("provenance") or {}).get("input_tokens", 0)
-    completion_tokens = result.get("completion_tokens")
-    if completion_tokens is None:
-        completion_tokens = (result.get("provenance") or {}).get("output_tokens", 0)
-
-    if prompt_tokens or completion_tokens:
-        baseline_cost = calc_baseline_cost(
-            int(prompt_tokens or 0),
-            int(completion_tokens or 0),
-            baseline_model="gpt-4o",
-        )
-    else:
-        baseline_cost = result["cost_usd"]
-
     overrides_obj = payload.policy_overrides or {}
     overrides_used = bool(
         overrides_obj.get("force_provider")

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProviderBadge } from "@/components/ProviderBadge";
 
 type ProviderStat = {
   provider: string;
@@ -365,7 +366,9 @@ export default function OverviewPage() {
                         key={p.provider}
                         className="border-t border-slate-800/70 text-slate-100"
                       >
-                        <td className="px-4 py-3 capitalize">{p.provider}</td>
+                        <td className="px-4 py-3">
+                          <ProviderBadge provider={p.provider} />
+                        </td>
                         <td className="px-4 py-3">
                           {p.runs.toLocaleString()}
                         </td>

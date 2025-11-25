@@ -15,10 +15,7 @@ prompts = [
     "Given a SaaS startup with churn of 4%/month and CAC of $500, outline 3 retention experiments and how you’d measure them.",
     "Explain the concept of causal inference vs correlation using 3 business examples: marketing, fraud, and HR analytics.",
     "Act as a staff engineer. Propose a high-level architecture for an AI-powered customer support router, including data stores and observability.",
-    "Explain how Monte Carlo simulation can be used for portfolio risk and what its main limitations are.",
-    "Compare RLHF and DPO training methods and explain in which scenarios each is more appropriate.",
-    "For a KYC process in online gambling, outline a risk-based scoring model and how AI could make it adaptive over time.",
-    "Explain vector databases to a non-technical CFO using 3 analogies and a concrete ROI example."
+    "Explain how Monte Carlo simulation can be used for portfolio risk and what its main limitations are.Compare RLHF and DPO training methods and explain in which scenarios each is more appropriate.For a KYC process in online gambling, outline a risk-based scoring model and how AI could make it adaptive over time.Explain vector databases to a non-technical CFO using 3 analogies and a concrete ROI example."
 ]
 
 def call_router(prompt: str):

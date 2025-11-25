@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ProviderBadge } from "@/components/ProviderBadge";
 
 type RunRecord = {
   id: number;
@@ -76,7 +77,7 @@ export default function LogsPage() {
   const formatAlri = (score?: number | null, tier?: string | null) => {
     if (score == null) return "—";
     const scoreText = score % 1 === 0 ? score.toFixed(0) : score.toFixed(1);
-    const tierLabel = tier ? tier.replace(/_/g, " ") : "";
+    const tierLabel = tier ? tier.split("_").pop() ?? "" : "";
     return tierLabel ? `${scoreText} (${tierLabel})` : scoreText;
   };
   const sortedItems = [...items].sort((a, b) => {
@@ -90,8 +91,6 @@ export default function LogsPage() {
           return record.band.toLowerCase();
         case "provider":
           return record.provider.toLowerCase();
-        case "model":
-          return record.model.toLowerCase();
         case "latency":
           return record.latency_ms;
         case "tokens":
@@ -243,12 +242,6 @@ export default function LogsPage() {
                         <SortIcon column="provider" />
                       </div>
                     </th>
-                    <th className="px-4 py-2 text-left font-medium">
-                      <div className="flex items-center gap-1">
-                        Model
-                        <SortIcon column="model" />
-                      </div>
-                    </th>
                     <th className="px-4 py-2 text-right font-medium">
                       <div className="flex items-center justify-end gap-1">
                         Latency
@@ -285,7 +278,7 @@ export default function LogsPage() {
                   {sortedItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         className="px-4 py-6 text-center text-slate-500"
                       >
                         No runs recorded yet.
@@ -301,9 +294,12 @@ export default function LogsPage() {
                         <td className="px-4 py-2 uppercase text-slate-400">
                           {r.band}
                         </td>
-                        <td className="px-4 py-2 capitalize">{r.provider}</td>
-                        <td className="px-4 py-2 font-mono text-[11px]">
-                          {r.model}
+                        <td className="px-4 py-2">
+                          <ProviderBadge
+                            provider={r.provider}
+                            model={r.model}
+                            showModel
+                          />
                         </td>
                         <td className="px-4 py-2 text-right">
                           {(r.latency_ms / 1000).toFixed(3)} s
