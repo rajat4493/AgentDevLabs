@@ -167,6 +167,7 @@ export default function LogsPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <main className="mx-auto max-w-6xl px-4 py-8">
+        <h1 className="mb-4 text-2xl font-semibold">Logs</h1>
         <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Usage logs</h1>

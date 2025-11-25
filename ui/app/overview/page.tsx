@@ -83,6 +83,7 @@ export default function OverviewPage() {
       {/* subtle gradient wash */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.22),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.16),_transparent_55%),linear-gradient(130deg,_rgba(12,18,40,0.9)_0%,_rgba(2,8,23,0.95)_60%)]" />
       <main className="relative mx-auto flex max-w-6xl flex-col gap-9 px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+        <h1 className="text-2xl font-semibold text-white">Overview</h1>
         {/* Hero */}
         <section className="space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-black/30 px-3 py-1 text-[11px] font-medium text-emerald-200 shadow-[0_4px_18px_rgba(16,185,129,0.35)] backdrop-blur">
