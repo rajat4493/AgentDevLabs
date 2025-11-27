@@ -22,6 +22,8 @@ def log_run(
     baseline_cost_usd: float,
     alri_score: float | None = None,
     alri_tier: str | None = None,
+    status: str | None = None,
+    routing_efficient: bool | None = None,
 ) -> RouterRun:
     savings_usd = baseline_cost_usd - cost_usd
     run = RouterRun(
@@ -39,6 +41,8 @@ def log_run(
         savings_usd=savings_usd,
         alri_score=alri_score,
         alri_tier=alri_tier,
+        status=status,
+        routing_efficient=routing_efficient,
     )
     db.add(run)
     db.commit()
@@ -107,7 +111,7 @@ def get_summary(db: Session) -> Dict[str, Any]:
     avg_alri = base.with_entities(func.avg(RouterRun.alri_score)).scalar()
     avg_alri = float(avg_alri) if avg_alri is not None else None
 
-    high_tiers = ["long_365d_full", "immutable_7y_full"]
+    high_tiers = ["orange_high", "red_critical"]
     high_risk = (
         base.with_entities(func.count(RouterRun.id))
         .filter(RouterRun.alri_tier.in_(high_tiers))
@@ -156,6 +160,8 @@ def list_runs(db: Session, *, offset: int, limit: int) -> Dict[str, Any]:
             "savings_usd": row.savings_usd,
             "alri_score": row.alri_score,
             "alri_tier": row.alri_tier,
+            "status": row.status,
+            "routing_efficient": row.routing_efficient,
         }
         for row in rows
     ]

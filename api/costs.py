@@ -59,3 +59,20 @@ def compute_costs(provider: str, model: str, prompt_tokens: int, completion_toke
     baseline_cost *= multiplier
 
     return actual_cost, baseline_cost
+
+
+def compute_baseline_cost(prompt_tokens: int, completion_tokens: int = 0) -> float:
+    """
+    Compute the spend if all provided tokens ran on the configured baseline model.
+    """
+    prompt_tokens = prompt_tokens or 0
+    completion_tokens = completion_tokens or 0
+
+    multiplier = float(os.getenv("AGENTICLABS_COST_MULTIPLIER", "1.0"))
+    base_provider = os.getenv("AGENTICLABS_BASELINE_PROVIDER", "openai")
+    base_model = os.getenv("AGENTICLABS_BASELINE_MODEL", "gpt-4o")
+    base_in, base_out = get_unit_prices(base_provider, base_model)
+
+    baseline_cost = (prompt_tokens * base_in + completion_tokens * base_out) / 1000.0
+    baseline_cost *= multiplier
+    return baseline_cost

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, Integer, String
+from sqlalchemy import Column, DateTime, Float, Integer, String, Boolean
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
@@ -31,3 +31,5 @@ class RouterRun(Base):
     savings_usd = Column(Float, nullable=False)
     alri_score = Column(Float, nullable=True)
     alri_tier = Column(String(50), nullable=True)
+    status = Column(String(32), nullable=True, index=True)
+    routing_efficient = Column(Boolean, nullable=True)

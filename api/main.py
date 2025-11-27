@@ -20,7 +20,7 @@ from logger import log_event
 from providers import PROVIDERS
 from costs import compute_costs
 from governance.alri import compute_alri_v2
-from routes import logs
+from routes import logs, metrics
 from db.models import Base
 from db.router_runs_repo import get_summary, list_runs as list_runs_repo, log_run
 from db.session import engine, get_db
@@ -37,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(logs.router)
+app.include_router(metrics.router)
 
 @app.get("/v1/metrics/summary")
 def metrics_summary(db: Session = Depends(get_db)):
@@ -74,6 +75,11 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
         requested_band = force_band
 
     task_type = payload.task_type
+
+    default_selection: SelectedModel = select_model(
+        band=inferred_band,
+        task_type=task_type,
+    )
 
     selected: SelectedModel = select_model(
         band=requested_band,
@@ -157,6 +163,8 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     # ---- Metrics ----
     overrides_used = selected.route_source == "manual_override"
 
+    run_status = "ok" if not pol["hil_triggered"] else "hil_required"
+
     alri_score, alri_tier = compute_alri_v2(
         band=selected.band,
         provider=provider_name,
@@ -166,6 +174,7 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
         cost_usd=result["cost_usd"],
         baseline_cost_usd=baseline_cost,
         overrides_used=overrides_used,
+        prompt_text=payload.prompt,
     )
 
     t_done = time.perf_counter()
@@ -175,6 +184,20 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     processing_latency_ms = max(
         0.0, total_latency_ms - router_latency_ms - provider_latency_ms
     )
+
+    # Routing efficiency: compare against default selection cost
+    default_cost, _ = compute_costs(
+        provider=default_selection.provider,
+        model=default_selection.model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    epsilon = 0.02
+    routing_efficient = False
+    if default_cost > 0:
+        routing_efficient = cost_usd <= (default_cost * (1 + epsilon))
+    else:
+        routing_efficient = True
 
     log_run(
         db,
@@ -192,6 +215,8 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
         baseline_cost_usd=baseline_cost,
         alri_score=alri_score,
         alri_tier=alri_tier,
+        status=run_status,
+        routing_efficient=routing_efficient,
     )
 
     # ---- Response ----
@@ -207,7 +232,7 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
 
     resp = RunResponse(
         run_id=rid,
-        status="ok" if not pol["hil_triggered"] else "hil_required",
+        status=run_status,
         output=result["output"],
         confidence=result["confidence"],
         provenance=Provenance(**result["provenance"]),
