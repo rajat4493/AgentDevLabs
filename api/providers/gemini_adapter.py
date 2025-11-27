@@ -9,11 +9,12 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     genai = None  # type: ignore
 
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-2.0-flash"
 DEFAULT_MAX_TOKENS = 1024
 
 GEMINI_PRICING: Dict[str, Dict[str, float]] = {
     # USD cost per token
+    "gemini-2.0-flash": {"input": 0.25 / 1_000_000, "output": 0.5 / 1_000_000},
     "gemini-1.5-flash": {"input": 0.35 / 1_000_000, "output": 1.05 / 1_000_000},
     "gemini-1.5-pro": {"input": 7.0 / 1_000_000, "output": 21.0 / 1_000_000},
 }

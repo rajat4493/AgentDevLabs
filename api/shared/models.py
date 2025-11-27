@@ -6,10 +6,16 @@ class RunRequest(BaseModel):
     agent_id: Optional[str] = Field(default="default-agent")
     context: Optional[Dict[str, Any]] = None
     policy_overrides: Optional[Dict[str, Any]] = None
+    band: Optional[str] = Field(default=None, description="Optional requested band (low/medium/high)")
+    task_type: Optional[str] = Field(default=None, description="Optional task type hint (default/code)")
+    force_provider: Optional[str] = None
+    force_model: Optional[str] = None
+    force_band: Optional[str] = None
 
 class Provenance(BaseModel):
     provider: str
     model: str
+    route_source: Optional[str] = None
     parameters: Dict[str, Any] = {}
 
 class PolicyEvaluation(BaseModel):

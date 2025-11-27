@@ -1,14 +1,20 @@
 import json
 import os
+from pathlib import Path
 from functools import lru_cache
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 @lru_cache(maxsize=1)
 def load_pricing_profile():
-    path = os.getenv(
+    path_str = os.getenv(
         "AGENTICLABS_PRICING_PROFILE_PATH",
-        "api/config/pricing_default.json",
+        "config/pricing_default.json",
     )
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = BASE_DIR / path
     with open(path, "r") as f:
         return json.load(f)
 
@@ -53,4 +59,3 @@ def compute_costs(provider: str, model: str, prompt_tokens: int, completion_toke
     baseline_cost *= multiplier
 
     return actual_cost, baseline_cost
-

@@ -1,4 +1,3 @@
-import os
 import time
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +14,8 @@ from shared.models import (
 )
 from router import compute_alri_tag, evaluate_policy, new_run_id
 from router.complexity import choose_band, score_complexity
+from router.rule_based import PROVIDER_DEFAULT_MODELS, SelectedModel, select_model
+from router.routing_rules import load_routing_rules
 from logger import log_event
 from providers import PROVIDERS
 from costs import compute_costs
@@ -23,35 +24,6 @@ from routes import logs
 from db.models import Base
 from db.router_runs_repo import get_summary, list_runs as list_runs_repo, log_run
 from db.session import engine, get_db
-
-
-def _env(name: str, default: str) -> str:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    value = value.strip()
-    return value if value else default
-
-# ---- Band-based routing config ----
-# Defaults are OpenAI; can be overridden via env vars.
-BAND_ROUTING = {
-    "simple": {
-        "provider": _env("PROVIDER_SIMPLE", _env("PROVIDER_DEFAULT", "openai")).lower(),
-        "model": _env("MODEL_SIMPLE", "gpt-4o-mini"),
-    },
-    "moderate": {
-        "provider": _env("PROVIDER_MODERATE", _env("PROVIDER_DEFAULT", "openai")).lower(),
-        "model": _env("MODEL_MODERATE", "gpt-4o"),
-    },
-    "complex": {
-        "provider": _env("PROVIDER_COMPLEX", _env("PROVIDER_DEFAULT", "anthropic")).lower(),
-        "model": _env("MODEL_COMPLEX", "claude-3-opus-20240229"),
-    },
-    "long_context": {
-        "provider": _env("PROVIDER_LONG_CONTEXT", _env("PROVIDER_DEFAULT", "gemini")).lower(),
-        "model": _env("MODEL_LONG_CONTEXT", "gemini-1.5-flash"),
-    },
-}
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
 Base.metadata.create_all(bind=engine)
@@ -79,7 +51,7 @@ def health():
     return {
         "ok": True,
         "service": "agenticlabs-api",
-        "routing": BAND_ROUTING,
+        "routing_rules": load_routing_rules(),
     }
 
 @app.post("/v1/run", response_model=RunResponse)
@@ -90,23 +62,33 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
 
     # ---- Smart routing (with manual override) ----
     cscore = score_complexity(payload.prompt)
-    cband = choose_band(cscore, payload.prompt)
+    inferred_band = choose_band(cscore, payload.prompt)
 
-    force_model = None
-    force_band = None
-    if payload.policy_overrides:
-        force_model = payload.policy_overrides.get("force_model")
-        force_band = payload.policy_overrides.get("force_band")
+    overrides = payload.policy_overrides or {}
+    force_model = payload.force_model or overrides.get("force_model")
+    force_provider = payload.force_provider or overrides.get("force_provider")
+    force_band = payload.force_band or overrides.get("force_band")
 
-    if force_band in {"simple", "moderate", "complex", "long_context"}:
-        cband = force_band
+    requested_band = payload.band or inferred_band
+    if isinstance(force_band, str) and force_band:
+        requested_band = force_band
 
-    route_cfg = BAND_ROUTING.get(cband) or BAND_ROUTING["moderate"]
-    provider_name = route_cfg["provider"]
-    model_name = force_model or route_cfg["model"]
+    task_type = payload.task_type
+
+    selected: SelectedModel = select_model(
+        band=requested_band,
+        task_type=task_type,
+        force_provider=force_provider,
+        force_model=force_model,
+    )
+
+    provider_name = selected.provider
+    model_name = selected.model
+    resolved_band = selected.band
 
     if provider_name not in PROVIDERS:
         provider_name = "openai"
+        model_name = PROVIDER_DEFAULT_MODELS.get(provider_name, model_name)
 
     provider_impl = PROVIDERS.get(provider_name)
     if provider_impl is None:
@@ -115,11 +97,14 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     log_event("route_complexity", {
         "run_id": rid,
         "score": round(cscore, 3),
-        "band": cband,
+        "band": resolved_band,
+        "inferred_band": inferred_band,
         "provider": provider_name,
         "model": model_name,
         "force_model": bool(force_model),
-        "force_band": bool(force_band)
+        "force_band": bool(force_band),
+        "force_provider": bool(force_provider),
+        "route_source": selected.route_source,
     })
 
     # ---- Plan + Execute ----
@@ -170,15 +155,10 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     alri_tag = compute_alri_tag(ctx.get("risk_band"), ctx.get("jurisdiction"))
 
     # ---- Metrics ----
-    overrides_obj = payload.policy_overrides or {}
-    overrides_used = bool(
-        overrides_obj.get("force_provider")
-        or overrides_obj.get("force_model")
-        or overrides_obj.get("force_band")
-    )
+    overrides_used = selected.route_source == "manual_override"
 
     alri_score, alri_tier = compute_alri_v2(
-        band=cband,
+        band=selected.band,
         provider=provider_name,
         model=model_name,
         prompt_tokens=int(prompt_tokens or 0),
@@ -199,7 +179,7 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     log_run(
         db,
 
-        band=cband,
+        band=resolved_band,
         provider=provider_name,
         model=model_name,
         latency_ms=total_latency_ms,
@@ -215,6 +195,16 @@ def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
     )
 
     # ---- Response ----
+    provenance = result.get("provenance") or {}
+    provenance.update(
+        {
+            "provider": provider_name,
+            "model": model_name,
+            "route_source": selected.route_source,
+        }
+    )
+    result["provenance"] = provenance
+
     resp = RunResponse(
         run_id=rid,
         status="ok" if not pol["hil_triggered"] else "hil_required",
