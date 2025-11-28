@@ -19,6 +19,8 @@ type MetricsSummary = {
   baseline_cost_usd: number | null;
   savings_vs_baseline_usd: number | null;
   savings_pct: number | null;
+  what_if_cost_usd: number | null;
+  what_if_vs_actual_usd: number | null;
   provider_breakdown: ProviderStat[];
   timeseries: { date: string; requests: number; cost_usd: number }[];
   avg_alri_score: number | null;
@@ -69,6 +71,8 @@ export default function OverviewPage() {
   const baselineCost = summary?.baseline_cost_usd ?? null;
   const savingsUsd = summary?.savings_vs_baseline_usd ?? null;
   const savingsPct = summary?.savings_pct ?? null;
+  const whatIfCost = summary?.what_if_cost_usd ?? null;
+  const whatIfDelta = summary?.what_if_vs_actual_usd ?? null;
   const savingsDisplay =
     savingsUsd != null && savingsPct != null
       ? `$${savingsUsd.toFixed(6)} (${savingsPct.toFixed(1)}%)`
@@ -173,7 +177,7 @@ export default function OverviewPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 pt-1">
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-4">
                   {/* Total runs */}
                   <div className="space-y-1">
                     <p className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -238,9 +242,9 @@ export default function OverviewPage() {
                       Router signal
                     </p>
                     <p className="mt-1 text-[13px] text-slate-200">
-                      The router is already logging latency and provider cost.
-                      Next steps: baseline vs actual cost and per-provider
-                      breakdown for concrete savings stories.
+                      Live latency, provider cost, and category tags for each
+                      request. Use Analytics for breakdowns, or drill into Logs
+                      to see how the router handled individual prompts.
                     </p>
                     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-900">
                       <div className="h-full w-2/3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-400" />
@@ -257,6 +261,23 @@ export default function OverviewPage() {
                     </p>
                     <p className="mt-1 text-[11px] text-slate-500">
                       Compared to routing 100% of traffic through gpt-4o.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800/70 bg-gradient-to-r from-[#050f1f]/85 to-[#01050c]/90 px-4 py-3 shadow-[0_12px_28px_rgba(1,5,18,0.55)]">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      What-if GPT-4.1 (est)
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-50">
+                      {whatIfCost != null ? `$${whatIfCost.toFixed(6)}` : "—"}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      vs actual:{" "}
+                      {whatIfDelta != null
+                        ? `${whatIfDelta >= 0 ? "+" : "-"}$${Math.abs(
+                            whatIfDelta,
+                          ).toFixed(6)}`
+                        : "—"}
                     </p>
                   </div>
                 </div>
@@ -292,42 +313,32 @@ export default function OverviewPage() {
               </CardContent>
             </Card>
 
-            {/* Right-hand “explainer” / product copy */}
-            <Card className="border border-slate-800/60 bg-gradient-to-br from-[#0b0f1d]/90 via-[#090d17]/85 to-[#04060c] shadow-[0_25px_70px_rgba(1,4,12,0.85)] backdrop-blur-lg">
-              <CardHeader className="pb-1">
-                <CardTitle className="text-sm font-medium text-slate-100">
-                  How to use this view
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-xs leading-relaxed text-slate-200/90">
+            <details className="self-start rounded-2xl border border-slate-800/60 bg-gradient-to-br from-[#0b0f1d]/90 via-[#090d17]/85 to-[#04060c] p-4 text-xs text-slate-200/90 transition-all duration-300">
+              <summary className="cursor-pointer text-sm font-medium text-slate-100">
+                How to use this view
+              </summary>
+              <div className="mt-3 space-y-3 leading-relaxed">
                 <p>
-                  <span className="font-semibold text-slate-50">
-                    Total runs
-                  </span>{" "}
-                  tells you how much traffic actually flows through your smart
+                  <span className="font-semibold text-slate-50">Total runs</span>{" "}
+                  shows how much traffic actually flows through your smart
                   router instead of hitting a single model directly.
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-50">
-                    Avg latency
-                  </span>{" "}
-                  is how fast the system feels to your agents, orchestration
-                  layer, or end-users.
+                  <span className="font-semibold text-slate-50">Avg latency</span>{" "}
+                  reflects how fast the system feels to agents, orchestrators, or
+                  end-users.
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-50">
-                    Total cost
-                  </span>{" "}
-                  will become the anchor for showing savings once multi-provider
-                  adapters (OpenAI, Anthropic, Ollama) are all enabled.
+                  <span className="font-semibold text-slate-50">Total cost</span>{" "}
+                  anchors savings stories once multi-provider adapters are fully
+                  enabled.
                 </p>
                 <p className="pt-2 text-[11px] text-slate-500">
-                  This is intentionally lean but polished — a premium-looking
-                  alpha view you can screenshot for early decks, while the
-                  backend metrics model matures.
+                  Designed for early decks: clean, premium metrics while the
+                  backend model matures.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </details>
           </section>
         )}
 
@@ -341,7 +352,7 @@ export default function OverviewPage() {
         )}
 
         {summary && (
-          <section className="space-y-3">
+      <section className="mt-6 space-y-3">
             <h2 className="text-sm font-semibold tracking-wide text-slate-200">
               Provider breakdown
             </h2>
