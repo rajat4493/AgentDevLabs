@@ -87,6 +87,9 @@ export default function PlaygroundPage() {
   const [prompt, setPrompt] = useState("");
   const [band, setBand] = useState<"low" | "medium" | "high">("medium");
   const [selectedProvider, setSelectedProvider] = useState<ProviderKey>("auto");
+  const [routerMode, setRouterMode] = useState<"baseline" | "enhanced">(
+    "baseline",
+  );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RouterResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +116,7 @@ export default function PlaygroundPage() {
         body: JSON.stringify({
           prompt,
           band,
+          router_mode: routerMode,
           force_provider: selectedProvider === "auto" ? null : selectedProvider,
         }),
       });
@@ -164,6 +168,30 @@ export default function PlaygroundPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="flex w-72 flex-col gap-4 border-r border-slate-800/80 bg-slate-950/80 p-4">
+          <div>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Router Mode
+            </h2>
+            <div className="flex gap-2">
+              {["baseline", "enhanced"].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    setRouterMode(mode as "baseline" | "enhanced")
+                  }
+                  className={cn(
+                    "flex-1 rounded-md border px-2 py-1 text-xs capitalize transition",
+                    routerMode === mode
+                      ? "border-emerald-400 bg-emerald-500/10 text-emerald-200"
+                      : "border-slate-700 bg-slate-950/60 text-slate-400 hover:bg-slate-900/60",
+                  )}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Provider Mode

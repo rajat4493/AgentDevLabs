@@ -6,6 +6,9 @@ class RunRequest(BaseModel):
     agent_id: Optional[str] = Field(default="default-agent")
     context: Optional[Dict[str, Any]] = None
     policy_overrides: Optional[Dict[str, Any]] = None
+    router_mode: Optional[str] = Field(
+        default=None, description="Optional router mode override (baseline/enhanced)"
+    )
     band: Optional[str] = Field(default=None, description="Optional requested band (low/medium/high)")
     task_type: Optional[str] = Field(default=None, description="Optional task type hint (default/code)")
     force_provider: Optional[str] = None

@@ -38,6 +38,9 @@ export async function POST(req: Request) {
       policy_overrides.force_provider = forceProvider;
     }
 
+    const routerMode =
+      typeof body?.router_mode === "string" ? body.router_mode : undefined;
+
     const runPayload: Record<string, unknown> = {
       prompt,
       agent_id: body?.agent_id ?? "router-playground",
@@ -45,6 +48,9 @@ export async function POST(req: Request) {
     };
     if (Object.keys(policy_overrides).length > 0) {
       runPayload.policy_overrides = policy_overrides;
+    }
+    if (routerMode) {
+      runPayload.router_mode = routerMode;
     }
 
     const apiRes = await fetch(`${API_BASE}/v1/run`, {

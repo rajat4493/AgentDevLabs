@@ -24,6 +24,8 @@ from routes import logs, metrics
 from db.models import Base
 from db.router_runs_repo import get_summary, list_runs as list_runs_repo, log_run
 from db.session import engine, get_db
+from config.router import RouterMode
+from deps import get_router_mode_dep
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
 Base.metadata.create_all(bind=engine)
@@ -56,10 +58,22 @@ def health():
     }
 
 @app.post("/v1/run", response_model=RunResponse)
-def run_endpoint(payload: RunRequest, db: Session = Depends(get_db)):
+def run_endpoint(
+    payload: RunRequest,
+    db: Session = Depends(get_db),
+    router_mode: RouterMode = Depends(get_router_mode_dep),
+):
+    if payload.router_mode:
+        try:
+            router_mode = RouterMode(payload.router_mode.lower())
+        except ValueError:
+            router_mode = router_mode
     rid = new_run_id()
     t_start = time.perf_counter()
-    log_event("router_in", {"run_id": rid, "agent_id": payload.agent_id})
+    log_event(
+        "router_in",
+        {"run_id": rid, "agent_id": payload.agent_id, "router_mode": router_mode.value},
+    )
 
     # ---- Smart routing (with manual override) ----
     cscore = score_complexity(payload.prompt)
