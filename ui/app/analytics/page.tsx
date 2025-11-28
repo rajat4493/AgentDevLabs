@@ -8,6 +8,7 @@ import { ProviderContextLabels } from "@/components/analytics/ProviderContextLab
 import { SavingsTrendChart } from "@/components/analytics/SavingsTrendChart";
 import { RoutingEfficiencyCard } from "@/components/analytics/RoutingEfficiencyCard";
 import { ProviderMixChart } from "@/components/analytics/ProviderMixChart";
+import { CategoryDistributionChart } from "@/components/analytics/CategoryDistributionChart";
 
 export default function AnalyticsPage() {
   return (
@@ -45,8 +46,9 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
-      <section>
+      <section className="grid gap-6 lg:grid-cols-2">
         <ProviderMixChart />
+        <CategoryDistributionChart />
       </section>
 
       <section>

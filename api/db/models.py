@@ -32,4 +32,6 @@ class RouterRun(Base):
     alri_score = Column(Float, nullable=True)
     alri_tier = Column(String(50), nullable=True)
     status = Column(String(32), nullable=True, index=True)
+    query_category = Column(String(50), nullable=True)
+    query_category_conf = Column(Float, nullable=True)
     routing_efficient = Column(Boolean, nullable=True)

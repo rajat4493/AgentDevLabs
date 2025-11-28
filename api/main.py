@@ -26,6 +26,7 @@ from db.router_runs_repo import get_summary, list_runs as list_runs_repo, log_ru
 from db.session import engine, get_db
 from config.router import RouterMode
 from deps import get_router_mode_dep
+from routing.categories import classify_query, QueryCategory
 
 app = FastAPI(title="AgenticLabs API", version="0.1.2")
 Base.metadata.create_all(bind=engine)
@@ -101,6 +102,7 @@ def run_endpoint(
         force_provider=force_provider,
         force_model=force_model,
     )
+    category, category_conf = classify_query(payload.prompt)
 
     provider_name = selected.provider
     model_name = selected.model
@@ -125,6 +127,8 @@ def run_endpoint(
         "force_band": bool(force_band),
         "force_provider": bool(force_provider),
         "route_source": selected.route_source,
+        "category": category.value,
+        "category_confidence": category_conf,
     })
 
     # ---- Plan + Execute ----
@@ -231,6 +235,8 @@ def run_endpoint(
         alri_tier=alri_tier,
         status=run_status,
         routing_efficient=routing_efficient,
+        query_category=category.value,
+        query_category_conf=category_conf,
     )
 
     # ---- Response ----
@@ -252,7 +258,9 @@ def run_endpoint(
         provenance=Provenance(**result["provenance"]),
         policy_evaluation=PolicyEvaluation(**pol),
         metrics=MetricsInfo(latency_ms=int(total_latency_ms), cost_usd=result["cost_usd"]),
-        audit=AuditInfo(retention_class=alri_tag, audit_hash=None)
+        audit=AuditInfo(retention_class=alri_tag, audit_hash=None),
+        query_category=category.value,
+        query_category_conf=category_conf,
     )
 
     log_event("router_out", {"run_id": rid, "status": resp.status})

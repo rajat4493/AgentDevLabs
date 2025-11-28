@@ -23,6 +23,8 @@ def log_run(
     alri_score: float | None = None,
     alri_tier: str | None = None,
     status: str | None = None,
+    query_category: str | None = None,
+    query_category_conf: float | None = None,
     routing_efficient: bool | None = None,
 ) -> RouterRun:
     savings_usd = baseline_cost_usd - cost_usd
@@ -42,6 +44,8 @@ def log_run(
         alri_score=alri_score,
         alri_tier=alri_tier,
         status=status,
+        query_category=query_category,
+        query_category_conf=query_category_conf,
         routing_efficient=routing_efficient,
     )
     db.add(run)
@@ -162,6 +166,8 @@ def list_runs(db: Session, *, offset: int, limit: int) -> Dict[str, Any]:
             "alri_tier": row.alri_tier,
             "status": row.status,
             "routing_efficient": row.routing_efficient,
+            "query_category": row.query_category,
+            "query_category_conf": row.query_category_conf,
         }
         for row in rows
     ]

@@ -64,6 +64,18 @@ class SavingsTrendResponse(BaseModel):
     points: List[SavingsPoint]
 
 
+class CategoryBreakdownItem(BaseModel):
+    category: str
+    runs: int
+    pct: float
+
+
+class CategoryBreakdownResponse(BaseModel):
+    window_hours: int
+    total_runs: int
+    items: List[CategoryBreakdownItem]
+
+
 __all__ = [
     "OverviewSummary",
     "ProviderBreakdownItem",
@@ -72,4 +84,6 @@ __all__ = [
     "TimeseriesResponse",
     "SavingsPoint",
     "SavingsTrendResponse",
+    "CategoryBreakdownItem",
+    "CategoryBreakdownResponse",
 ]

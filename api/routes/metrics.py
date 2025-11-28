@@ -17,6 +17,8 @@ from shared.metrics import (
     TimeseriesResponse,
     SavingsPoint,
     SavingsTrendResponse,
+    CategoryBreakdownItem,
+    CategoryBreakdownResponse,
 )
 
 router = APIRouter(prefix="/v1/metrics", tags=["metrics"])
@@ -303,6 +305,49 @@ def get_provider_breakdown(
         window_hours=window_hours,
         total_runs=total_runs,
         total_cost_usd=total_cost,
+        items=items,
+    )
+
+
+@router.get("/categories", response_model=CategoryBreakdownResponse)
+def get_category_distribution(
+    window_hours: int = Query(168, ge=1, le=2160),
+    db: Session = Depends(get_db),
+) -> CategoryBreakdownResponse:
+    since = datetime.utcnow() - timedelta(hours=window_hours)
+    total_runs = (
+        db.query(func.count(RouterRun.id))
+        .filter(RouterRun.created_at >= since)
+        .scalar()
+        or 0
+    )
+
+    rows = (
+        db.query(
+            RouterRun.query_category,
+            func.count(RouterRun.id).label("runs"),
+        )
+        .filter(RouterRun.created_at >= since)
+        .group_by(RouterRun.query_category)
+        .order_by(func.count(RouterRun.id).desc())
+        .all()
+    )
+
+    items: list[CategoryBreakdownItem] = []
+    for category, runs in rows:
+        cat = category or "unknown"
+        pct = (runs / total_runs * 100.0) if total_runs else 0.0
+        items.append(
+            CategoryBreakdownItem(
+                category=cat,
+                runs=runs,
+                pct=pct,
+            )
+        )
+
+    return CategoryBreakdownResponse(
+        window_hours=window_hours,
+        total_runs=total_runs,
         items=items,
     )
 

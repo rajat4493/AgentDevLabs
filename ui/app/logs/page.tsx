@@ -20,6 +20,7 @@ type RunRecord = {
   savings_usd: number;
   alri_score?: number | null;
   alri_tier?: string | null;
+  query_category?: string | null;
 };
 
 type LogsResponse = {
@@ -101,6 +102,8 @@ export default function LogsPage() {
           return record.savings_usd;
         case "alri":
           return record.alri_score ?? -Infinity;
+        case "category":
+          return (record.query_category ?? "unknown").toLowerCase();
         default:
           return 0;
       }
@@ -161,6 +164,7 @@ export default function LogsPage() {
       "savings_usd",
       "alri_score",
       "alri_tier",
+      "query_category",
     ];
     const rows = sortedItems.map((row) => [
       row.id,
@@ -179,6 +183,7 @@ export default function LogsPage() {
       row.savings_usd,
       row.alri_score ?? "",
       row.alri_tier ?? "",
+      row.query_category ?? "",
     ]);
     const csv = [headers, ...rows]
       .map((cols) =>
@@ -313,6 +318,12 @@ export default function LogsPage() {
                         <SortIcon column="provider" />
                       </div>
                     </th>
+                    <th className="px-4 py-2 text-left font-medium">
+                      <div className="flex items-center gap-1">
+                        Category
+                        <SortIcon column="category" />
+                      </div>
+                    </th>
                     <th className="px-4 py-2 text-right font-medium">
                       <div className="flex items-center justify-end gap-1">
                         Latency
@@ -365,13 +376,18 @@ export default function LogsPage() {
                         <td className="px-4 py-2 uppercase text-slate-400">
                           {r.band}
                         </td>
-                        <td className="px-4 py-2">
-                          <ProviderBadge
-                            provider={r.provider}
-                            model={r.model}
-                            showModel
-                          />
-                        </td>
+                    <td className="px-4 py-2">
+                      <ProviderBadge
+                        provider={r.provider}
+                        model={r.model}
+                        showModel
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="rounded-full border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-300">
+                        {r.query_category ?? "general"}
+                      </span>
+                    </td>
                         <td className="px-4 py-2 text-right">
                           {(r.latency_ms / 1000).toFixed(3)} s
                           {r.router_latency_ms != null &&
