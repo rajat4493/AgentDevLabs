@@ -1,1 +1,3 @@
-# Application-level domain models
+from .tenant import Tenant, User
+
+__all__ = ["Tenant", "User"]

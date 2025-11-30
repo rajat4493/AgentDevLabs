@@ -1,5 +1,25 @@
 import re
 
+RISK_KEYWORDS = [
+    "analyze",
+    "optimize",
+    "summarize",
+    "compare",
+    "design",
+    "explain",
+    "policy",
+    "architecture",
+    "draft",
+    "contract",
+    "clause",
+    "compliance",
+    "legal",
+    "governance",
+    "security",
+    "regulation",
+    "migration",
+]
+
 def score_complexity(prompt: str) -> float:
     """
     Lightweight heuristic complexity score in [0,1].
@@ -24,22 +44,7 @@ def score_complexity(prompt: str) -> float:
     f_sent = min(len(re.split(r"[.!?]+", prompt)) / 20.0, 1.0)
 
     # keywords hinting complexity
-    KW = [
-        "analyze",
-        "optimize",
-        "summarize",
-        "compare",
-        "design",
-        "explain",
-        "policy",
-        "architecture",
-        "draft",
-        "contract",
-        "clause",
-        "compliance",
-        "legal",
-    ]
-    keywords = [k for k in KW if k in prompt.lower()]
+    keywords = [k for k in RISK_KEYWORDS if k in prompt.lower()]
     f_kw = min(0.1 * len(keywords), 0.3)
 
     score = (
@@ -59,15 +64,15 @@ LONG_CONTEXT_CHAR_THRESHOLD = 4000
 def choose_band(score: float, prompt: str | None = None) -> str:
     text = prompt or ""
     text_len = len(text)
+    lower_text = text.lower()
+    keyword_hits = sum(1 for k in RISK_KEYWORDS if k in lower_text)
 
     if text_len >= LONG_CONTEXT_CHAR_THRESHOLD:
         return "long_context"
-    if text_len <= 160 and score <= 0.15:
-        return "simple"
-    if text_len >= 2000 or score >= 0.85:
+    if text_len >= 900 or score >= 0.65 or keyword_hits >= 3:
         return "complex"
-    if score < 0.35:
+    if text_len <= 160 and score <= 0.12 and keyword_hits == 0:
         return "simple"
-    if score < 0.7:
-        return "moderate"
-    return "complex"
+    if score < 0.35 and text_len < 350 and keyword_hits <= 1:
+        return "simple"
+    return "moderate"

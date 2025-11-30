@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
+from cost.calculator import calculate_cost, resolve_model_key
 from analytics.aggregate_overview import aggregate_overview_costs
 from .models import RouterRun
 
@@ -10,6 +11,7 @@ from .models import RouterRun
 def log_run(
     db: Session,
     *,
+    tenant_id: str | None,
     band: str,
     provider: str,
     model: str,
@@ -31,6 +33,7 @@ def log_run(
 ) -> RouterRun:
     savings_usd = baseline_cost_usd - cost_usd
     run = RouterRun(
+        tenant_id=tenant_id,
         band=band,
         provider=provider,
         model=model,
@@ -64,12 +67,35 @@ def get_summary(db: Session) -> Dict[str, Any]:
     cost_rows = (
         base.with_entities(
             RouterRun.band,
+            RouterRun.provider,
+            RouterRun.model,
             RouterRun.prompt_tokens,
             RouterRun.completion_tokens,
             RouterRun.cost_usd,
         ).all()
     )
-    overview_costs = aggregate_overview_costs(cost_rows)
+    prepared_rows = []
+    for row in cost_rows:
+        band, provider, model, prompt_tokens, completion_tokens, cost_usd = row
+        actual_cost = float(cost_usd or 0.0)
+        if actual_cost <= 0:
+            model_key = resolve_model_key(provider, model)
+            actual_cost = calculate_cost(
+                model_key=model_key,
+                provider=provider,
+                model=model,
+                input_tokens=prompt_tokens or 0,
+                output_tokens=completion_tokens or 0,
+            )
+        prepared_rows.append(
+            {
+                "band": band,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "cost_usd": actual_cost,
+            }
+        )
+    overview_costs = aggregate_overview_costs(prepared_rows)
     total_cost = float(overview_costs["total_actual_cost"] or 0.0)
 
     avg_latency = (

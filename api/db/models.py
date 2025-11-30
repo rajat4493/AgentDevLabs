@@ -1,4 +1,5 @@
 from sqlalchemy import Column, DateTime, Float, Integer, String, Boolean
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
@@ -15,6 +16,7 @@ class RouterRun(Base):
         nullable=False,
         index=True,
     )
+    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     band = Column(String(20), nullable=False)
     provider = Column(String(50), nullable=False)

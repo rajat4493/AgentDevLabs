@@ -85,4 +85,32 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
         },
         pricing={"input_per_million": 3.0, "output_per_million": 15.0},
     ),
+    "anthropic:claude-3-opus-20240229": ModelConfig(
+        key="anthropic:claude-3-opus-20240229",
+        provider="anthropic",
+        model_id="claude-3-opus-20240229",
+        display_name="Claude 3 Opus",
+        capabilities={
+            "reasoning": 0.93,
+            "coding": 0.9,
+            "creative": 0.92,
+            "operations": 0.9,
+            "product": 0.91,
+        },
+        pricing={"input_per_million": 6.0, "output_per_million": 18.0},
+    ),
+    "gemini:gemini-2.0-flash": ModelConfig(
+        key="gemini:gemini-2.0-flash",
+        provider="gemini",
+        model_id="gemini-2.0-flash",
+        display_name="Gemini 2.0 Flash",
+        capabilities={
+            "reasoning": 0.75,
+            "coding": 0.72,
+            "creative": 0.8,
+            "operations": 0.78,
+            "product": 0.76,
+        },
+        pricing={"input_per_million": 0.2, "output_per_million": 0.8},
+    ),
 }

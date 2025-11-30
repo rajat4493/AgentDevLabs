@@ -128,6 +128,21 @@ export default function OverviewPage() {
                   .
                 </p>
               )}
+              <div className="relative inline-flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wide text-slate-500">
+                  Baseline
+                </span>
+                <button
+                  type="button"
+                  className="group relative rounded-full border border-slate-700 px-2 py-0.5 text-[11px] font-semibold text-slate-200/80 hover:border-slate-500"
+                >
+                  ?
+                  <span className="pointer-events-none absolute left-1/2 top-full mt-1 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-950/95 p-3 text-left text-[11px] text-slate-200 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    Industry standard = 70% GPT‑4o, 30% GPT‑4o‑mini. This represents
+                    typical developer behavior without systematic optimization.
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1 text-right text-[11px] text-slate-400">

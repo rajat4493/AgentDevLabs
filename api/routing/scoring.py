@@ -46,11 +46,21 @@ def risk_penalty_for_band(band: str) -> float:
     return 0.0
 
 
+def _weights_for_cost_mode(cost_mode: str) -> tuple[float, float]:
+    mode = (cost_mode or "balanced").lower()
+    if mode == "cost":
+        return 0.45, 0.45
+    if mode == "quality":
+        return 0.7, 0.2
+    return 0.55, 0.3
+
+
 def choose_enhanced_model(
     *,
     category: QueryCategory,
     allowed_model_keys: Iterable[str],
     resolved_band: str,
+    cost_mode: str = "balanced",
 ) -> Optional[ModelConfig]:
     candidates = [
         MODEL_REGISTRY[key]
@@ -65,10 +75,11 @@ def choose_enhanced_model(
     best_score = float("-inf")
     penalty = risk_penalty_for_band(resolved_band)
 
+    cap_weight, cost_weight = _weights_for_cost_mode(cost_mode)
     for model in candidates:
         capability = model.capabilities.get(cap_key, 0.6)
         cost_component = cost_score(model)
-        score = (0.6 * capability) + (0.3 * cost_component) - penalty
+        score = (cap_weight * capability) + (cost_weight * cost_component) - penalty
         if score > best_score:
             best_score = score
             best_model = model
