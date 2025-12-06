@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rajos"
+version = "0.1.0"
+description = "RAJOS Python SDK for tracing and routing LLM calls"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "../LICENSE" }
+authors = [{ name = "AgentDevLabs" }]
+dependencies = [
+  "requests>=2.31"
+]
+
+[project.urls]
+homepage = "https://github.com/AgentDevLabs/RAJOS"
+repository = "https://github.com/AgentDevLabs/RAJOS"
+
+[tool.setuptools.packages.find]
+where = ["."]
