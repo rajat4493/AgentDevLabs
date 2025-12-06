@@ -18,6 +18,27 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL &&
   process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, "");
 
+let firstRunCache: string | null | undefined;
+
+async function getFirstRunDate(): Promise<string | null> {
+  if (firstRunCache !== undefined) {
+    return firstRunCache ?? null;
+  }
+  try {
+    const endpoint = API_BASE
+      ? `${API_BASE}/v1/metrics/first_run`
+      : "/v1/metrics/first_run";
+    const res = await fetch(endpoint);
+    if (!res.ok) throw new Error("failed");
+    const json = await res.json();
+    firstRunCache = json?.first_run_at ?? null;
+    return firstRunCache ?? null;
+  } catch {
+    firstRunCache = null;
+    return null;
+  }
+}
+
 export function useTimeseries(
   metric: string,
   windowHours: number = 24,
@@ -45,6 +66,17 @@ export function useTimeseries(
 
         const res = await fetch(endpoint);
         if (!res.ok) {
+          if (res.status === 422) {
+            const firstRun = await getFirstRunDate();
+            if (firstRun) {
+              const dateString = new Date(firstRun).toLocaleString();
+              setError(`First data available starting ${dateString}.`);
+            } else {
+              setError("No analytics data yet. Run traffic to populate charts.");
+            }
+            setData([]);
+            return;
+          }
           throw new Error(`HTTP ${res.status}`);
         }
 

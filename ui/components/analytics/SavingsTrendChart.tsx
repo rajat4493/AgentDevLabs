@@ -13,8 +13,14 @@ import {
 
 import { useSavingsTimeseries } from "@/hooks/useSavingsTimeseries";
 
-export function SavingsTrendChart() {
-  const { data, loading, error } = useSavingsTimeseries(168, "day");
+type SavingsTrendProps = {
+  windowHours: number;
+  bucket: "hour" | "day";
+};
+
+export function SavingsTrendChart({ windowHours, bucket }: SavingsTrendProps) {
+  const { data, loading, error } = useSavingsTimeseries(windowHours, bucket);
+  const trendLabel = bucket === "hour" ? "Hourly" : "Daily";
   const chartData = data.map((point) => ({
     label: new Date(point.timestamp).toLocaleDateString(undefined, {
       month: "short",
@@ -28,7 +34,7 @@ export function SavingsTrendChart() {
     <div className="flex h-72 flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4">
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-slate-100">
-          Savings Trend (Daily)
+          Savings Trend ({trendLabel})
         </h3>
         <p className="text-xs text-slate-500">
           Daily savings vs baseline with cumulative growth.

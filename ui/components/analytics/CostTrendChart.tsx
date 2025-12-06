@@ -12,8 +12,17 @@ import {
 
 import { useTimeseries } from "@/hooks/useTimeseries";
 
-export function CostTrendChart() {
-  const { data, loading, error } = useTimeseries("cost", 24, "hour");
+type CostTrendProps = {
+  windowHours: number;
+  bucket: "hour" | "day";
+};
+
+export function CostTrendChart({ windowHours, bucket }: CostTrendProps) {
+  const { data, loading, error } = useTimeseries(
+    "cost",
+    windowHours,
+    bucket,
+  );
 
   const chartData = data.map((point) => ({
     ...point,

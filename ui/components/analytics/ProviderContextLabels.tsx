@@ -2,8 +2,12 @@
 
 import { useProviderMetrics } from "@/hooks/useProviders";
 
-export function ProviderContextLabels() {
-  const { data } = useProviderMetrics();
+type ProviderContextProps = {
+  windowHours: number;
+};
+
+export function ProviderContextLabels({ windowHours }: ProviderContextProps) {
+  const { data } = useProviderMetrics(windowHours);
 
   return (
     <div className="mt-4 space-y-2">

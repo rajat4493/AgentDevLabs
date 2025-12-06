@@ -2,8 +2,16 @@
 
 import { useRoutingEfficiency } from "@/hooks/useRoutingEfficiency";
 
-export function RoutingEfficiencyCard() {
-  const { data, error } = useRoutingEfficiency(168);
+type RoutingEfficiencyProps = {
+  windowHours: number;
+  label: string;
+};
+
+export function RoutingEfficiencyCard({
+  windowHours,
+  label,
+}: RoutingEfficiencyProps) {
+  const { data, error } = useRoutingEfficiency(windowHours);
 
   if (error || !data) {
     return (
@@ -36,7 +44,7 @@ export function RoutingEfficiencyCard() {
         </p>
       )}
       <p className="mt-2 text-xs text-slate-400">
-        Based on {data.total_runs} runs over the last {data.window_hours / 24} days.
+        Based on {data.total_runs} runs over {label}.
       </p>
     </div>
   );

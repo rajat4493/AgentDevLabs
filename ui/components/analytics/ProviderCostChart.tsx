@@ -12,8 +12,12 @@ import {
 
 import { useProviderMetrics } from "@/hooks/useProviders";
 
-export function ProviderCostChart() {
-  const { data, loading, error } = useProviderMetrics();
+type ProviderChartProps = {
+  windowHours: number;
+};
+
+export function ProviderCostChart({ windowHours }: ProviderChartProps) {
+  const { data, loading, error } = useProviderMetrics(windowHours);
 
   const chartData = data.map((provider) => ({
     provider: provider.provider,

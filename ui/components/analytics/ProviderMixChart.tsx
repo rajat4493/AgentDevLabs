@@ -31,8 +31,12 @@ function ProviderMixTooltip({
   );
 }
 
-export function ProviderMixChart() {
-  const { data, loading, error } = useProviderMetrics();
+type ProviderMixProps = {
+  windowHours: number;
+};
+
+export function ProviderMixChart({ windowHours }: ProviderMixProps) {
+  const { data, loading, error } = useProviderMetrics(windowHours);
   const totalRuns = data.reduce((sum, provider) => sum + provider.total_runs, 0);
   const chartData = data.map((provider) => ({
     name: provider.provider,

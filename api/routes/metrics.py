@@ -414,3 +414,16 @@ def get_timeseries(
         window_hours=window_hours,
         points=points,
     )
+
+
+@router.get("/first_run")
+def get_first_run(db: Session = Depends(get_db)):
+    first = (
+        db.query(RouterRun.created_at)
+        .order_by(RouterRun.created_at.asc())
+        .limit(1)
+        .scalar()
+    )
+    if not first:
+        return {"first_run_at": None}
+    return {"first_run_at": first}

@@ -17,7 +17,7 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL &&
   process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, "");
 
-export function useProviderMetrics() {
+export function useProviderMetrics(windowHours: number) {
   const [data, setData] = useState<ProviderMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +28,12 @@ export function useProviderMetrics() {
       setError(null);
 
       try {
+        const params = new URLSearchParams({
+          window_hours: String(windowHours),
+        });
         const endpoint = API_BASE
-          ? `${API_BASE}/v1/metrics/providers`
-          : "/v1/metrics/providers";
+          ? `${API_BASE}/v1/metrics/providers?${params.toString()}`
+          : `/v1/metrics/providers?${params.toString()}`;
         const res = await fetch(endpoint);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
@@ -44,7 +47,7 @@ export function useProviderMetrics() {
     }
 
     load();
-  }, []);
+  }, [windowHours]);
 
   return { data, loading, error };
 }

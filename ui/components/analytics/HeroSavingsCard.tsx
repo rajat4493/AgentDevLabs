@@ -14,24 +14,29 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL &&
   process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, "");
 
-export function HeroSavingsCard() {
+type HeroSavingsCardProps = {
+  windowHours: number;
+  label: string;
+};
+
+export function HeroSavingsCard({ windowHours, label }: HeroSavingsCardProps) {
   const [data, setData] = useState<SavingsResponse | null>(null);
 
   useEffect(() => {
     const endpoint = API_BASE
-      ? `${API_BASE}/v1/metrics/savings?window_hours=24`
-      : "/v1/metrics/savings?window_hours=24";
+      ? `${API_BASE}/v1/metrics/savings?window_hours=${windowHours}`
+      : `/v1/metrics/savings?window_hours=${windowHours}`;
     fetch(endpoint)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(setData)
       .catch(() => setData(null));
-  }, []);
+  }, [windowHours]);
 
   if (!data) return null;
 
   return (
     <div className="rounded-xl border border-emerald-500/40 bg-gradient-to-br from-slate-900/60 to-slate-900/20 p-6 shadow-lg">
-      <h2 className="text-base font-semibold text-white">Savings (Last 24h)</h2>
+      <h2 className="text-base font-semibold text-white">Savings ({label})</h2>
       <p className="text-2xl font-bold text-emerald-400">
         ${data.savings_usd.toFixed(5)}{" "}
         <span className="text-base font-semibold text-emerald-300">

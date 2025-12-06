@@ -22,7 +22,15 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL &&
   process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, "");
 
-export function CategoryDistributionChart() {
+type CategoryDistributionProps = {
+  windowHours: number;
+  label: string;
+};
+
+export function CategoryDistributionChart({
+  windowHours,
+  label,
+}: CategoryDistributionProps) {
   const [data, setData] = useState<CategoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +40,9 @@ export function CategoryDistributionChart() {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ window_hours: "168" });
+        const params = new URLSearchParams({
+          window_hours: String(windowHours),
+        });
         const endpoint = API_BASE
           ? `${API_BASE}/v1/metrics/categories?${params.toString()}`
           : `/v1/metrics/categories?${params.toString()}`;
@@ -48,13 +58,13 @@ export function CategoryDistributionChart() {
       }
     }
     load();
-  }, []);
+  }, [windowHours]);
 
   return (
     <div className="flex h-72 flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4">
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-slate-100">
-          Query Category Distribution (7d)
+          Query Category Distribution ({label})
         </h3>
         <p className="text-xs text-slate-500">
           Mix of workloads routed through the system.

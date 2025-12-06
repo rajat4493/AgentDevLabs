@@ -12,8 +12,17 @@ import {
 
 import { useTimeseries } from "@/hooks/useTimeseries";
 
-export function AlriTrendChart() {
-  const { data, loading, error } = useTimeseries("alri", 24, "hour");
+type AlriTrendProps = {
+  windowHours: number;
+  bucket: "hour" | "day";
+};
+
+export function AlriTrendChart({ windowHours, bucket }: AlriTrendProps) {
+  const { data, loading, error } = useTimeseries(
+    "alri",
+    windowHours,
+    bucket,
+  );
 
   const chartData = data.map((point) => ({
     ...point,

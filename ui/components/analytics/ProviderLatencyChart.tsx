@@ -12,8 +12,12 @@ import {
 
 import { useProviderMetrics } from "@/hooks/useProviders";
 
-export function ProviderLatencyChart() {
-  const { data, loading, error } = useProviderMetrics();
+type ProviderLatencyProps = {
+  windowHours: number;
+};
+
+export function ProviderLatencyChart({ windowHours }: ProviderLatencyProps) {
+  const { data, loading, error } = useProviderMetrics(windowHours);
 
   const chartData = data.map((provider) => ({
     provider: provider.provider,
