@@ -1,30 +1,9 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from backend.db import Base, get_session
-from backend.main import app
-
-engine = create_engine("sqlite+pysqlite:///:memory:", future=True, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-Base.metadata.create_all(bind=engine)
+from backend.db import SessionLocal
 
 
-def override_get_session():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_session] = override_get_session
-client = TestClient(app)
-
-
-def test_create_trace_and_fetch() -> None:
+def test_create_trace_and_fetch(client):
     payload = {
         "provider": "openai",
         "model": "gpt-4o-mini",
@@ -49,7 +28,7 @@ def test_create_trace_and_fetch() -> None:
     assert fetched["extra"]["foo"] == "bar"
 
 
-def test_chat_endpoint_uses_stub_provider() -> None:
+def test_chat_endpoint_uses_stub_provider(client):
     payload = {
         "prompt": "Say hello",
         "provider": "stub",

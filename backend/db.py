@@ -10,23 +10,12 @@ from typing import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from .config import get_settings
+DATABASE_URL = "sqlite:///./rajos.db"
 
-settings = get_settings()
-
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, future=True, connect_args=connect_args)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+connect_args = {"check_same_thread": False}
+engine = create_engine(DATABASE_URL, future=True, connect_args=connect_args)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 Base = declarative_base()
-
-
-def init_db() -> None:
-    """
-    Ensure tables are created. Importing models registers metadata on Base.
-    """
-    from . import models  # noqa: F401
-
-    Base.metadata.create_all(bind=engine)
 
 
 def get_session() -> Iterator[Session]:
@@ -53,4 +42,4 @@ def session_scope() -> Iterator[Session]:
         db.close()
 
 
-__all__ = ["Base", "engine", "SessionLocal", "get_session", "session_scope", "init_db"]
+__all__ = ["Base", "engine", "SessionLocal", "get_session", "session_scope", "DATABASE_URL"]

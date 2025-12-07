@@ -4,7 +4,6 @@ SQLAlchemy models for the RAJOS backend.
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, Dict
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, func
@@ -15,7 +14,7 @@ from .db import Base
 class Trace(Base):
     __tablename__ = "traces"
 
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

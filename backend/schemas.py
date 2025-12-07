@@ -44,7 +44,7 @@ class TraceCreate(TraceBase):
 
 
 class TraceRead(ORMModel):
-    id: str
+    id: int
     created_at: datetime
     provider: str
     model: str
@@ -58,7 +58,7 @@ class TraceRead(ORMModel):
 
 
 class TraceListItem(ORMModel):
-    id: str
+    id: int
     created_at: datetime
     provider: str
     model: str
@@ -97,7 +97,7 @@ class ChatResponse(BaseModel):
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
     cost_usd: Optional[float] = None
-    trace_id: str
+    trace_id: int
     band: str
     route_source: str
 

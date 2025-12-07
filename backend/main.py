@@ -10,10 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.router import router as router_api
 from backend.api.traces import router as traces_api
 from backend.config import get_settings
-from backend.db import init_db
 
 settings = get_settings()
-init_db()
 
 app = FastAPI(
     title="RAJOS API",
