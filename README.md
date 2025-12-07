@@ -26,7 +26,7 @@ ui/           # Next.js dashboard for landing + traces view
 1. **Backend**
    ```bash
    python -m venv .venv && source .venv/bin/activate
-   pip install fastapi uvicorn sqlalchemy pydantic requests
+   pip install fastapi uvicorn sqlalchemy pydantic requests redis
    uvicorn backend.main:app --reload
    ```
    The API runs on `http://localhost:8000`.

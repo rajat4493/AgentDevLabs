@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-from typing import Dict
-
-OPENAI_PRICING: Dict[str, Dict[str, float]] = {
-    # prices per single token in USD
-    "gpt-4o": {"input": 2.50 / 1_000_000, "output": 10.00 / 1_000_000},
-    "gpt-4o-mini": {"input": 0.15 / 1_000_000, "output": 0.60 / 1_000_000},
-}
+from backend.cost import compute_costs, get_pricing_config, CostBreakdown
 
 
-def get_pricing(model: str, default: str = "gpt-4o-mini") -> Dict[str, float]:
-    return OPENAI_PRICING.get(model) or OPENAI_PRICING[default]
+def get_pricing(model: str, default: str = "gpt-4o-mini") -> dict:
+    """
+    Backwards compatible helper that returns pricing info for a model.
+    """
+
+    cfg = get_pricing_config()
+    provider_pricing = cfg._providers.get("openai") or {}
+    pricing = provider_pricing.get(model) or provider_pricing.get(default)
+    return pricing or {"input": 0.0, "output": 0.0, "unit": "per_million"}
 
 
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    pricing = get_pricing(model)
-    cost_input = prompt_tokens * pricing["input"]
-    cost_output = completion_tokens * pricing["output"]
-    return round(cost_input + cost_output, 8)
+    breakdown = compute_costs(
+        provider="openai",
+        model=model,
+        input_tokens=prompt_tokens,
+        output_tokens=completion_tokens,
+    )
+    return breakdown.total_cost
 
 
 def calc_baseline_cost(
@@ -25,10 +29,13 @@ def calc_baseline_cost(
     completion_tokens: int,
     baseline_model: str = "gpt-4o",
 ) -> float:
-    pricing = get_pricing(baseline_model, default="gpt-4o")
-    cost_input = prompt_tokens * pricing["input"]
-    cost_output = completion_tokens * pricing["output"]
-    return round(cost_input + cost_output, 8)
+    breakdown = compute_costs(
+        provider="openai",
+        model=baseline_model,
+        input_tokens=prompt_tokens,
+        output_tokens=completion_tokens,
+    )
+    return breakdown.total_cost
 
 
-__all__ = ["get_pricing", "estimate_cost", "calc_baseline_cost"]
+__all__ = ["CostBreakdown", "get_pricing_config", "get_pricing", "estimate_cost", "calc_baseline_cost"]

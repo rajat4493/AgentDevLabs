@@ -26,10 +26,12 @@ class DummyResponse:
 class DummySession:
     def __init__(self) -> None:
         self.calls: List[Dict[str, Any]] = []
+        self.response_payload: Dict[str, Any] | None = None
 
     def request(self, *, method: str, url: str, timeout: float, **kwargs: Any) -> DummyResponse:
         self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-        return DummyResponse(payload={"ok": True, "method": method})
+        payload = self.response_payload or {"ok": True, "method": method}
+        return DummyResponse(payload=payload)
 
     def close(self) -> None:
         pass
@@ -54,3 +56,25 @@ def test_client_raises_on_http_error() -> None:
     client = RajosClient(session=ErrorSession())
     with pytest.raises(RajosClientError):
         client.list_traces()
+
+
+def test_complete_returns_structured_result() -> None:
+    session = DummySession()
+    session.response_payload = {
+        "output": "Stub result",
+        "provider": "stub",
+        "model": "stub-echo-1",
+        "tokens": 5,
+        "prompt_tokens": 2,
+        "completion_tokens": 3,
+        "cost": {"currency": "USD", "total_cost": 0.000003},
+        "trace_id": 12,
+        "band": "low",
+        "route_source": "router",
+    }
+    client = RajosClient(session=session)
+    result = client.complete("hello world")
+    assert result.content == "Stub result"
+    assert result.usage["input_tokens"] == 2
+    assert result.cost["total_cost"] == 0.000003
+    assert client.last_cost == result.cost

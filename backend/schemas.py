@@ -102,6 +102,7 @@ class ChatResponse(BaseModel):
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
     cost_usd: Optional[float] = None
+    cost: Optional[Dict[str, Any]] = None
     trace_id: int
     band: str
     route_source: str
