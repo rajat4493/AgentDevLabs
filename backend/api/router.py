@@ -72,18 +72,33 @@ def route_chat(request: schemas.ChatRequest, db: Session = Depends(get_session))
     plan_params.setdefault("prompt", prompt)
     plan = adapter.plan(plan_params, selection.model)
     t0 = time.perf_counter()
-    result = adapter.execute(plan, prompt)
-    measured_latency = int((time.perf_counter() - t0) * 1000)
 
-    output_text = (result.get("output") or "").strip()
-    prompt_tokens = _safe_int(result.get("prompt_tokens"))
-    completion_tokens = _safe_int(result.get("completion_tokens"))
-    total_tokens = (prompt_tokens + completion_tokens) or None
-    latency_ms = result.get("latency_ms")
-    latency_value = _safe_int(latency_ms) if latency_ms is not None else measured_latency
-    cost_usd = _safe_float(result.get("cost_usd"))
-    if cost_usd is None and total_tokens is not None:
-        cost_usd = estimate_cost(selection.model, prompt_tokens, completion_tokens)
+    status_value = "success"
+    error_message = None
+    measured_latency = None
+    try:
+        result = adapter.execute(plan, prompt)
+        measured_latency = int((time.perf_counter() - t0) * 1000)
+        output_text = (result.get("output") or "").strip()
+        prompt_tokens = _safe_int(result.get("prompt_tokens"))
+        completion_tokens = _safe_int(result.get("completion_tokens"))
+        total_tokens = (prompt_tokens + completion_tokens) or None
+        latency_ms = result.get("latency_ms")
+        latency_value = _safe_int(latency_ms) if latency_ms is not None else measured_latency
+        cost_usd = _safe_float(result.get("cost_usd"))
+        if cost_usd is None and total_tokens is not None:
+            cost_usd = estimate_cost(selection.model, prompt_tokens, completion_tokens)
+    except Exception as exc:  # noqa: BLE001
+        status_value = "error"
+        error_message = repr(exc)
+        measured_latency = int((time.perf_counter() - t0) * 1000)
+        result = {}
+        output_text = ""
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = None
+        latency_value = measured_latency
+        cost_usd = None
 
     run_id = new_run_id()
     trace_payload = schemas.TraceCreate(
@@ -95,6 +110,8 @@ def route_chat(request: schemas.ChatRequest, db: Session = Depends(get_session))
         latency_ms=latency_value,
         framework=request.framework or "raw",
         source=request.source or "router",
+        status=status_value,
+        error_message=error_message,
         extra=_merge_metadata(
             request.metadata,
             {
@@ -113,6 +130,12 @@ def route_chat(request: schemas.ChatRequest, db: Session = Depends(get_session))
         ),
     )
     trace = create_trace_record(db, trace_payload)
+
+    if status_value == "error":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="LLM call failed",
+        )
 
     return schemas.ChatResponse(
         output=output_text,

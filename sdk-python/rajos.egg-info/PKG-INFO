@@ -1,0 +1,39 @@
+Metadata-Version: 2.4
+Name: rajos
+Version: 0.1.0
+Summary: RAJOS Python SDK for tracing and routing LLM calls
+Author: AgentDevLabs
+License: RAJOS SDK - Internal Use Only
+        
+Project-URL: homepage, https://github.com/AgentDevLabs/RAJOS
+Project-URL: repository, https://github.com/AgentDevLabs/RAJOS
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: requests>=2.31
+Dynamic: license-file
+
+# RAJOS Python SDK
+
+Developer-first helpers for talking to the local RAJOS backend.
+
+## Install
+
+```bash
+pip install -e .
+```
+
+## Usage
+
+```python
+from rajos import RajosClient, trace_llm_call
+
+client = RajosClient()  # defaults to http://localhost:8000
+client.list_traces(limit=10)
+
+@trace_llm_call(provider="openai", model="gpt-4o-mini")
+def ask(prompt: str, rajos_metadata=None):
+    return call_my_llm(prompt)
+```
+
+Pass `rajos_metadata` when calling the wrapped function to add run-specific metadata into the stored trace.

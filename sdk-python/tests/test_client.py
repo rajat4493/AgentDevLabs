@@ -38,10 +38,12 @@ class DummySession:
 def test_client_posts_trace_payload() -> None:
     session = DummySession()
     client = RajosClient(base_url="http://localhost:9999", session=session)
-    resp = client.create_trace(provider="stub", model="stub-echo-1", input="hi", output="bye")
+    resp = client.log_trace(provider="stub", model="stub-echo-1", input="hi", output="bye")
     assert resp["ok"] is True
-    assert session.calls[0]["method"] == "post"
-    assert session.calls[0]["url"].endswith("/api/traces")
+    call = session.calls[0]
+    assert call["method"] == "post"
+    assert call["url"].endswith("/api/traces")
+    assert call["kwargs"]["json"]["status"] == "success"
 
 
 def test_client_raises_on_http_error() -> None:

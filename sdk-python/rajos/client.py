@@ -10,6 +10,8 @@ from typing import Any, Dict, Mapping, MutableMapping
 import requests
 from requests import Session
 
+from . import config
+
 
 class RajosClientError(RuntimeError):
     """Raised when the backend cannot be reached."""
@@ -20,11 +22,14 @@ class RajosClient:
         self,
         *,
         base_url: str | None = None,
-        timeout: float = 15.0,
+        api_key: str | None = None,
+        timeout: float | None = None,
         session: Session | None = None,
     ) -> None:
-        self.base_url = (base_url or os.getenv("RAJOS_BASE_URL") or "http://localhost:8000").rstrip("/")
-        self.timeout = timeout
+        resolved_base = base_url or os.getenv("RAJOS_BASE_URL") or config.BASE_URL
+        self.base_url = resolved_base.rstrip("/")
+        self.api_key = api_key if api_key is not None else config.API_KEY
+        self.timeout = timeout if timeout is not None else config.TIMEOUT
         self.session = session or requests.Session()
 
     def _url(self, path: str) -> str:
@@ -51,6 +56,36 @@ class RajosClient:
         Create a trace directly via POST /api/traces.
         """
         return self._request("post", "/api/traces", json=trace_payload)
+
+    def log_trace(
+        self,
+        *,
+        provider: str,
+        model: str,
+        input: str,
+        output: str,
+        tokens: int | None = None,
+        latency_ms: int | None = None,
+        framework: str = "raw",
+        source: str = "sdk",
+        extra: Dict[str, Any] | None = None,
+        status: str = "success",
+        error_message: str | None = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "provider": provider,
+            "model": model,
+            "input": input,
+            "output": output,
+            "tokens": tokens,
+            "latency_ms": latency_ms,
+            "framework": framework,
+            "source": source,
+            "extra": extra,
+            "status": status,
+            "error_message": error_message,
+        }
+        return self.create_trace(**payload)
 
     def route_chat(self, prompt: str, **params: Any) -> Dict[str, Any]:
         """

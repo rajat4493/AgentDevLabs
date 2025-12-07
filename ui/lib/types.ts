@@ -3,6 +3,8 @@ export type TraceListItem = {
   created_at: string;
   provider: string;
   model: string;
+  input?: string | null;
+  tokens?: number | null;
   latency_ms?: number | null;
   framework?: string | null;
   source?: string | null;

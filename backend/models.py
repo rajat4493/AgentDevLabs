@@ -29,6 +29,8 @@ class Trace(Base):
     latency_ms = Column(Integer, nullable=True)
     framework = Column(String(64), nullable=True)
     source = Column(String(64), nullable=True)
+    status = Column(String(20), nullable=False, default="success")
+    error_message = Column(Text, nullable=True)
     extra = Column(JSON, nullable=True, default=dict)
 
     def as_dict(self) -> Dict[str, Any]:

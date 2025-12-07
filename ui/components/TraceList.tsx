@@ -7,18 +7,6 @@ type TraceListProps = {
   onRefresh?: () => void;
 };
 
-const formatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "medium",
-});
-
-function formatLatency(latency?: number | null) {
-  if (latency === null || latency === undefined) {
-    return "—";
-  }
-  return `${latency} ms`;
-}
-
 export function TraceList({ traces, loading = false, onRefresh }: TraceListProps) {
   return (
     <div className="rounded-xl border border-slate-900/60 bg-slate-900/40">
@@ -41,14 +29,16 @@ export function TraceList({ traces, loading = false, onRefresh }: TraceListProps
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-900/70 text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="px-4 py-3">Timestamp</th>
+            <tr className="bg-slate-800/60 text-left text-xs font-semibold uppercase tracking-wide text-slate-200">
+              <th className="px-4 py-3">Created At</th>
               <th className="px-4 py-3">Provider</th>
               <th className="px-4 py-3">Model</th>
-              <th className="px-4 py-3">Latency</th>
+              <th className="px-4 py-3">Latency (ms)</th>
+              <th className="px-4 py-3">Tokens</th>
+              <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Framework</th>
               <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3" />
+              <th className="px-4 py-3">View</th>
             </tr>
           </thead>
           <tbody>
@@ -59,23 +49,37 @@ export function TraceList({ traces, loading = false, onRefresh }: TraceListProps
                 </td>
               </tr>
             )}
-            {traces.map((trace) => (
+            {traces.map((trace, index) => (
               <tr
                 key={trace.id}
-                className="border-t border-slate-900/70 text-slate-200 transition hover:bg-slate-900/70"
+                className={`border-t border-slate-900/70 text-slate-200 transition ${
+                  index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/20"
+                } hover:bg-slate-900/70`}
               >
                 <td className="px-4 py-3 text-xs font-mono">
-                  {formatter.format(new Date(trace.created_at))}
+                  {new Date(trace.created_at).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 capitalize">{trace.provider}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-300">{trace.model}</td>
-                <td className="px-4 py-3">{formatLatency(trace.latency_ms)}</td>
+                <td className="px-4 py-3">{trace.latency_ms ?? "—"}</td>
+                <td className="px-4 py-3">{trace.tokens ?? "—"}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded px-2 py-1 text-xs font-semibold ${
+                      trace.status === "error"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {trace.status || "unknown"}
+                  </span>
+                </td>
                 <td className="px-4 py-3">{trace.framework || "—"}</td>
                 <td className="px-4 py-3">{trace.source || "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/traces/${trace.id}`}
-                    className="text-xs font-semibold uppercase tracking-widest text-amber-300 hover:text-amber-200"
+                    className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-amber-300 hover:text-amber-200"
                   >
                     View
                   </Link>

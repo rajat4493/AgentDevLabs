@@ -3,6 +3,7 @@ RAJOS Python SDK surface.
 """
 
 from .client import RajosClient
-from .decorators import trace_llm_call
+from .config import set_config as init
+from .decorators import trace_llm_call, trace_span
 
-__all__ = ["RajosClient", "trace_llm_call"]
+__all__ = ["init", "RajosClient", "trace_llm_call", "trace_span"]

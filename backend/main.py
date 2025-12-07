@@ -16,6 +16,7 @@ if __package__ is None or __package__ == "":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api import stats as stats_api
 from backend.api.router import router as router_api
 from backend.api.traces import router as traces_api
 from backend.config import get_settings
@@ -46,6 +47,7 @@ app.add_middleware(
 )
 
 app.include_router(traces_api)
+app.include_router(stats_api.router)
 app.include_router(router_api)
 
 

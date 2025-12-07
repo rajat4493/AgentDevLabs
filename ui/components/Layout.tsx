@@ -11,6 +11,7 @@ type LayoutProps = {
 const NAV_LINKS = [
   { label: "Overview", href: "/" },
   { label: "Traces", href: "/traces" },
+  { label: "Stats", href: "/stats" },
 ];
 
 export function Layout({ title, subtitle, actions, children }: LayoutProps) {

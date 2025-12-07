@@ -36,6 +36,8 @@ class TraceBase(BaseModel):
     latency_ms: Optional[int] = Field(None, description="Measured latency in milliseconds")
     framework: Optional[str] = Field(None, description="SDK/framework that generated the trace")
     source: Optional[str] = Field(None, description="Where the trace came from (router/sdk/playground)")
+    status: str = Field("success", description="Trace status indicator (success/error)")
+    error_message: Optional[str] = Field(None, description="Error info when status=error")
     extra: Optional[Dict[str, Any]] = Field(None, description="Arbitrary metadata blob")
 
 
@@ -62,9 +64,12 @@ class TraceListItem(ORMModel):
     created_at: datetime
     provider: str
     model: str
+    input: Optional[str] = None
+    tokens: Optional[int] = None
     latency_ms: Optional[int] = None
     framework: Optional[str] = None
     source: Optional[str] = None
+    status: str
 
 
 class TraceListResponse(BaseModel):
