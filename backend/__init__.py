@@ -1,3 +1,0 @@
-"""
-RAJOS backend package bootstrap.
-"""

@@ -1,24 +1,26 @@
-# RAJOS Python SDK
+# lattice-sdk
 
-Developer-first helpers for talking to the local RAJOS backend.
+Lightweight Python client for the Lattice Dev Edition API.
 
 ## Install
 
 ```bash
+pip install lattice-sdk
+# or for local development
 pip install -e .
 ```
 
 ## Usage
 
 ```python
-from rajos import RajosClient, trace_llm_call
+from lattice_sdk import LatticeClient
 
-client = RajosClient()  # defaults to http://localhost:8000
-client.list_traces(limit=10)
-
-@trace_llm_call(provider="openai", model="gpt-4o-mini")
-def ask(prompt: str, rajos_metadata=None):
-    return call_my_llm(prompt)
+client = LatticeClient()  # defaults to http://localhost:8000
+result = client.complete(
+    prompt="Classify the following text as pii/non-pii.",
+    band="low",
+)
+print(result.text, result.cost["total_cost"], result.tags)
 ```
 
-Pass `rajos_metadata` when calling the wrapped function to add run-specific metadata into the stored trace.
+The legacy `rajos` import path continues to work via a shim that re-exports `LatticeClient` and `CompleteResult`.

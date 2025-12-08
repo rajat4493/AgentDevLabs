@@ -39,7 +39,7 @@ export default function RoutingFlow({ provider, model, source }: RoutingFlowProp
   const modelLabel = model?.trim() || "Unknown";
 
   const midLabel =
-    source === "sdk" ? "SDK" : source === "router" ? "RAJOS Router" : "System";
+    source === "sdk" ? "SDK" : source === "router" ? "Lattice Router" : "System";
 
   const steps = [
     { label: "User Prompt", className: "bg-blue-50 border-blue-200 text-blue-900" },

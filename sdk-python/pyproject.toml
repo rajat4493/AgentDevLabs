@@ -3,24 +3,23 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rajos"
-version = "0.1.0"
-description = "RAJOS Python SDK for tracing and routing LLM calls"
+name = "lattice-sdk"
+version = "0.3.0"
+description = "Lattice Dev Edition Python client for /v1/complete"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "AgentDevLabs" }]
 dependencies = [
-  "requests>=2.31",
-  "redis>=5.0.0"
+  "httpx>=0.27",
 ]
 
 [project.urls]
-homepage = "https://github.com/AgentDevLabs/RAJOS"
-repository = "https://github.com/AgentDevLabs/RAJOS"
+homepage = "https://github.com/AgentDevLabs/lattice"
+repository = "https://github.com/AgentDevLabs/lattice"
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [tool.setuptools.package-data]
-"rajos" = ["data/*.json"]
+"lattice_sdk" = []

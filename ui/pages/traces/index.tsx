@@ -1,172 +1,131 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Layout } from "@/components/Layout";
-import { TraceList } from "@/components/TraceList";
-import type { TraceListItem } from "@/lib/types";
+import { useEffect, useState } from "react";
+import LatticeShell from "@/components/LatticeShell";
 
-const API_BASE = process.env.NEXT_PUBLIC_RAJOS_API_BASE || "http://localhost:8000";
-
-type TraceListResponse = {
-  items: TraceListItem[];
-  total: number;
+type MetricsResponse = {
+  total_requests: number;
+  total_cost: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  average_latency_ms: number;
+  cache_hits_total: number;
+  cache_misses_total: number;
+  pii_detected_total: number;
+  providers: Record<string, number>;
+  bands: Record<string, number>;
+  models: Record<string, number>;
 };
 
-export default function TracesPage() {
-  const [traces, setTraces] = useState<TraceListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [providerFilter, setProviderFilter] = useState("all");
-  const [frameworkFilter, setFrameworkFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("newest");
+const API_BASE = process.env.NEXT_PUBLIC_LATTICE_API_BASE || "http://localhost:8000";
 
-  const loadTraces = useCallback(async () => {
+export default function MetricsPage() {
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(`${API_BASE}/api/traces?limit=50`);
+      const resp = await fetch(`${API_BASE}/v1/metrics`);
       if (!resp.ok) throw new Error(`Backend error (${resp.status})`);
-      const data: TraceListResponse = await resp.json();
-      setTraces(data.items);
+      const data: MetricsResponse = await resp.json();
+      setMetrics(data);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    void loadTraces();
-  }, [loadTraces]);
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setSearch(searchInput);
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [searchInput]);
-
-  const filteredTraces = useMemo(() => {
-    const searchTerm = search.trim().toLowerCase();
-    return traces
-      .filter((trace) => {
-        const prompt = (trace.input || "").toLowerCase();
-        return searchTerm ? prompt.includes(searchTerm) : true;
-      })
-      .filter((trace) => (providerFilter === "all" ? true : trace.provider?.toLowerCase() === providerFilter))
-      .filter((trace) =>
-        frameworkFilter === "all" ? true : (trace.framework || "").toLowerCase() === frameworkFilter,
-      )
-      .filter((trace) => (sourceFilter === "all" ? true : (trace.source || "").toLowerCase() === sourceFilter))
-      .sort((a, b) => {
-        const aTime = new Date(a.created_at).getTime();
-        const bTime = new Date(b.created_at).getTime();
-        return sortBy === "newest" ? bTime - aTime : aTime - bTime;
-      });
-  }, [traces, search, providerFilter, frameworkFilter, sourceFilter, sortBy]);
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="rounded-xl border border-slate-900/60 bg-slate-900/40 py-16 text-center text-slate-200">
-          Loading traces...
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-950/40 py-16 text-center text-rose-100">
-          Failed to load traces. Check backend connection.
-        </div>
-      );
-    }
-
-    return (
-      <>
-        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:flex-wrap">
-        <input
-          type="search"
-          placeholder="Search prompt..."
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          className="w-full rounded-md border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-0 lg:flex-1"
-        />
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-none">
-          <Select
-            label="Provider"
-            value={providerFilter}
-            onChange={setProviderFilter}
-            options={["all", "openai", "anthropic", "ollama", "fake-llm"]}
-          />
-          <Select
-            label="Framework"
-            value={frameworkFilter}
-            onChange={setFrameworkFilter}
-            options={["all", "raw", "langchain", "crewai", "smolagents"]}
-          />
-          <Select
-            label="Source"
-            value={sourceFilter}
-            onChange={setSourceFilter}
-            options={["all", "sdk", "router", "ui", "curl"]}
-          />
-          <Select label="Sort" value={sortBy} onChange={setSortBy} options={["newest", "oldest"]} />
-        </div>
-        </div>
-        {filteredTraces.length === 0 ? (
-          <div className="rounded-xl border border-slate-900/60 bg-slate-900/40 py-16 text-center text-slate-400">
-            No traces match your filters.
-          </div>
-        ) : (
-          <TraceList traces={filteredTraces} loading={loading} onRefresh={loadTraces} />
-        )}
-      </>
-    );
-  };
-
   return (
-    <Layout
-      title="Trace Explorer"
-      subtitle="Inspect every routed request from the last mile of your devkit."
+    <LatticeShell
+      title="Metrics Monitor"
+      subtitle="Lattice Dev Edition only exposes aggregated metrics—no per-trace storage."
       actions={
         <button
           type="button"
-          onClick={loadTraces}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-200 transition hover:border-amber-400"
+          onClick={load}
+          className="rounded-xl border border-slate-700/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-200 transition hover:border-emerald-500"
         >
           Refresh
         </button>
       }
     >
-      {renderContent()}
-    </Layout>
+      {loading && <div className="rounded-2xl border border-slate-800/70 bg-[#0B1020]/80 py-16 text-center text-slate-200">Loading metrics...</div>}
+      {error && (
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-950/30 py-16 text-center text-rose-100">
+          Failed to load metrics. {error}
+        </div>
+      )}
+      {metrics && !loading && !error && (
+        <div className="space-y-8">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Metric label="Total Requests" value={metrics.total_requests.toLocaleString()} />
+            <Metric label="Total Cost (USD)" value={`$${metrics.total_cost.toFixed(6)}`} />
+            <Metric label="Avg Latency (ms)" value={metrics.average_latency_ms.toFixed(1)} />
+            <Metric label="Input Tokens" value={metrics.total_input_tokens.toLocaleString()} />
+            <Metric label="Output Tokens" value={metrics.total_output_tokens.toLocaleString()} />
+            <Metric label="PII/PHI Flags" value={metrics.pii_detected_total} />
+            <Metric label="Cache Hits" value={metrics.cache_hits_total} />
+            <Metric label="Cache Misses" value={metrics.cache_misses_total} />
+          </div>
+
+          <Breakdown title="Providers" entries={metrics.providers} />
+          <Breakdown title="Bands" entries={metrics.bands} />
+          <Breakdown title="Models" entries={metrics.models} mono />
+        </div>
+      )}
+    </LatticeShell>
   );
 }
 
-type SelectProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-};
-
-function Select({ label, value, onChange, options }: SelectProps) {
+function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <label className="flex flex-col text-xs uppercase tracking-[0.3em] text-slate-300">
-      <span className="mb-1">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-w-[150px] rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option.charAt(0).toUpperCase() + option.slice(1)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 text-center shadow-[0_0_40px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-3 text-2xl font-semibold font-mono text-slate-800 dark:text-slate-50">{value}</p>
+    </div>
+  );
+}
+
+function Breakdown({
+  title,
+  entries,
+  mono = false,
+}: {
+  title: string;
+  entries: Record<string, number>;
+  mono?: boolean;
+}) {
+  const keys = Object.keys(entries);
+  if (keys.length === 0) {
+    return null;
+  }
+  return (
+    <div>
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{title}</h2>
+      <table className="min-w-full divide-y divide-slate-900/50 rounded-2xl border border-slate-900/60 bg-[#0B1020]/70 text-sm text-slate-100">
+        <thead className="bg-slate-900/60 text-left text-[11px] uppercase tracking-[0.2em] text-slate-400">
+          <tr>
+            <th className="px-4 py-2">{title.slice(0, -1)}</th>
+            <th className="px-4 py-2">Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map((key) => (
+            <tr key={key} className="border-t border-slate-900/60">
+              <td className={`px-4 py-2 ${mono ? "font-mono" : "capitalize"}`}>{key}</td>
+              <td className="px-4 py-2">{entries[key]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

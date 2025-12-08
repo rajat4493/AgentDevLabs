@@ -6,6 +6,13 @@ module.exports = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}"
   ],
-  theme: { extend: {} },
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ["system-ui", "Inter", "sans-serif"],
+        mono: ["ui-monospace", "SF Mono", "Menlo", "monospace"],
+      },
+    },
+  },
   plugins: []
 };

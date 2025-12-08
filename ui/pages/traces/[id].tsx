@@ -1,43 +1,21 @@
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { Layout } from "@/components/Layout";
-import { TraceDetail } from "@/components/TraceDetail";
-import type { Trace } from "@/lib/types";
+import LatticeShell from "@/components/LatticeShell";
 
-const API_BASE = process.env.NEXT_PUBLIC_RAJOS_API_BASE || "http://localhost:8000";
-
-export default function TraceDetailPage() {
+export default function TraceDetailPlaceholder() {
   const router = useRouter();
   const { id } = router.query;
-  const [trace, setTrace] = useState<Trace | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!router.isReady || typeof id !== "string") {
-      return;
-    }
-    setLoading(true);
-    setTrace(null);
-    setError(null);
-    fetch(`${API_BASE}/api/traces/${id}`)
-      .then(async (resp) => {
-        if (!resp.ok) throw new Error(`Backend error (${resp.status})`);
-        const data: Trace = await resp.json();
-        setTrace(data);
-      })
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setLoading(false));
-  }, [router.isReady, id]);
 
   return (
-    <Layout title="Trace Detail" subtitle={typeof id === "string" ? `Trace ${id}` : "Loading..."}>
-      {error && (
-        <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-sm text-rose-200">
-          Failed to reach the RAJOS API: {error}
-        </div>
-      )}
-      <TraceDetail trace={trace} loading={loading} />
-    </Layout>
+    <LatticeShell title="Trace Detail" subtitle="Lattice Dev Edition does not persist per-request traces.">
+      <div className="rounded-2xl border border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 p-6 text-sm text-slate-700 dark:text-slate-200 shadow-[0_0_40px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+        <p className="mb-2">
+          Request <strong>{typeof id === "string" ? `#${id}` : ""}</strong> cannot be displayed because Lattice never stores
+          raw prompts or responses. Use the metrics views or `/dashboard` to monitor aggregate activity.
+        </p>
+        <p>
+          Need per-request logging? Fork the repo and add your own persistence layer—just keep the privacy guarantees in mind.
+        </p>
+      </div>
+    </LatticeShell>
   );
 }

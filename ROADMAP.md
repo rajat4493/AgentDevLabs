@@ -1,20 +1,20 @@
-# RAJOS Roadmap
+# Lattice Dev Edition Roadmap
 
 ## Near-term
 
-- **Trace filters & search** – date range, provider/model filters, and free-text search in the FastAPI `/api/traces` endpoint + UI.
-- **SDK telemetry** – automatic token estimation + structured error reporting in the Python decorator.
-- **Router profiling** – add cost + latency deltas per provider/model to the `/api/chat` response and trace metadata.
-- **Desktop-friendly packaging** – templated scripts for booting backend + UI together (`make dev`, `just dev`).
+- **PII tag tuning.** Expand regex + keyword coverage and add severity levels while keeping the no-storage guarantee.
+- **Metrics sinks.** Optional Redis/influx counters so aggregates survive server restarts without per-request logs.
+- **Provider overrides.** Expose `provider_overrides` in `bands.json` + `/v1/complete` payload.
+- **Inline eval hooks.** Allow lightweight callouts (e.g., toxicity classifiers) that only emit tags, not raw text.
 
 ## Mid-term
 
-- **Multi-language SDKs** – TypeScript and Go clients with matching decorators/middleware.
-- **Timeline visualizations** – render multi-step agent traces with spans + child events.
-- **Provider sandbox runners** – optional local wrappers for Ollama and LiteLLM so you can test without cloud keys.
+- **TypeScript client.** Match the Python SDK with a small `lattice-sdk` package for Node scripts + Vercel functions.
+- **CLI scaffolding.** `lattice dev` helper that boots Redis + uvicorn + sample prompts from a single command.
+- **Workspace cache.** Optional in-memory cache backend for teams without Redis.
 
 ## Long-term
 
-- **Sync adapters** – opt-in push to ClickHouse/Postgres/Snowflake for teams that outgrow SQLite.
-- **Policy hooks** – lightweight guardrails (PII detection, prompt classifiers) that run before/after routing.
-- **Plugin slots** – register custom adapters, band scorers, or trace enrichers via entrypoints.
+- **Aggregated export.** Nightly CSV or Parquet dumps with metrics per provider/band instead of trace rows.
+- **Custom bands.** Plug in new scorers and configs through entrypoints.
+- **Cost guardrails.** User-defined budget thresholds that short-circuit routes before they leave the box.
