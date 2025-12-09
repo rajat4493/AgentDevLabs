@@ -5,10 +5,11 @@ Cost layer helpers for the lattice backend.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
+
+from .config import settings
 
 TokenUnit = Literal["per_million", "per_1k"]
 
@@ -71,9 +72,7 @@ def get_pricing_config() -> PricingConfig:
     if _PRICING_CONFIG is not None:
         return _PRICING_CONFIG
 
-    default_path = Path(__file__).parent / "data" / "pricing.json"
-    path_str = os.getenv("LATTICE_PRICING_FILE", str(default_path))
-    _PRICING_CONFIG = PricingConfig.from_file(path_str)
+    _PRICING_CONFIG = PricingConfig.from_file(settings.pricing_file)
     return _PRICING_CONFIG
 
 

@@ -56,6 +56,7 @@ ui/            # Legacy Next.js dashboard (optional; /dashboard HTML is built in
 | `POST /v1/complete` | Routes a prompt, enforces band/model, TTL cache, computes cost + tags. Returns `{text, usage, cost, latency_ms, band, routing_reason, tags}`. |
 | `GET /v1/metrics` | Returns aggregated metrics only (no per-request rows). |
 | `GET /v1/health` | `{ "status": "ok" }` heartbeat. |
+| `GET /v1/ready` | Checks cache/provider readiness; 503 when dependencies fail. |
 | `GET /dashboard` | Minimal HTML view that polls `/v1/metrics`. |
 
 ## Environment
@@ -68,9 +69,11 @@ ui/            # Legacy Next.js dashboard (optional; /dashboard HTML is built in
 | `LATTICE_CACHE_DISABLED` | Set to `1` to disable Redis cache | `0` |
 | `LATTICE_CACHE_TTL_SECONDS` | Cache TTL for `/v1/complete` payloads | `60` |
 | `LATTICE_CACHE_PREFIX` | Redis key prefix | `lattice:cache` |
-| `LATTICE_BANDS_FILE` | Path to `bands.json` for routing | `lattice/data/bands.json` |
+| `BANDS_CONFIG_PATH` | Path to `bands.json` for routing | `lattice/data/bands.json` |
 | `LATTICE_PRICING_FILE` | Path to `pricing.json` for cost | `lattice/data/pricing.json` |
-| `REDIS_URL` | Cache backend | `redis://localhost:6379/0` |
+| `LATTICE_RATE_LIMIT_ENABLED` | Enable per-key/IP rate limiting | `0` |
+| `LATTICE_RATE_LIMIT_PER_DAY` | Requests per 24h window when enabled | `1000` |
+| `REDIS_URL` | Cache + rate limit backend | `redis://localhost:6379/0` |
 
 ## Invariants enforced in code
 

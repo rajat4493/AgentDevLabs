@@ -1,15 +1,16 @@
 """
-Redis-backed cache helpers for the lattice backend router.
+Cache helpers for storing short-lived responses.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-try:  # pragma: no cover - optional dependency is validated at runtime
+from .config import settings
+
+try:  # pragma: no cover - optional dependency
     import redis  # type: ignore[import]
 except ImportError:  # pragma: no cover
     redis = None  # type: ignore[assignment]
@@ -24,7 +25,7 @@ class CacheDisabled(Exception):
 
 class CacheClient:
     """
-    Thin wrapper around Redis for exact-match cache.
+    Thin wrapper around Redis for hashed payload cache.
     """
 
     def __init__(self, redis_client: "redis.Redis", prefix: str, ttl_seconds: int) -> None:
@@ -33,47 +34,43 @@ class CacheClient:
         self._ttl_seconds = ttl_seconds
 
     @classmethod
-    def from_env(cls) -> "CacheClient":
-        from .config import get_settings
-
-        settings = get_settings()
+    def create(cls) -> "CacheClient":
         if settings.cache_disabled:
             raise CacheDisabled("Lattice cache disabled via env var.")
-
-        if redis is None:
-            raise CacheDisabled("redis package is not installed.")
-
+        if not settings.redis_url or redis is None:
+            raise CacheDisabled("Redis cache not configured.")
         client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
-        return cls(redis_client=client, prefix=settings.cache_prefix, ttl_seconds=settings.cache_ttl_seconds)
+        return cls(client, prefix=settings.cache_prefix, ttl_seconds=settings.cache_ttl_seconds)
 
     def _full_key(self, key: str) -> str:
         return f"{self._prefix}:{key}"
 
-    def get_json(self, key: str) -> Optional[Dict[str, Any]]:
-        full_key = self._full_key(key)
-        value = self._redis.get(full_key)
+    def get(self, key: str) -> Optional[Dict[str, Any]]:
+        value = self._redis.get(self._full_key(key))
         if value is None:
             return None
         try:
-            return json.loads(value)
+            payload = json.loads(value)
         except json.JSONDecodeError:
             return None
+        return payload if isinstance(payload, dict) else None
 
-    def set_json(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
-        full_key = self._full_key(key)
-        if is_dataclass(value):
-            payload = asdict(value)
-        else:
-            payload = value
+    def set(self, key: str, value: Dict[str, Any], ttl_seconds: Optional[int] = None) -> None:
         ttl = ttl_seconds or self._ttl_seconds
-        self._redis.set(full_key, json.dumps(payload), ex=ttl)
+        self._redis.set(self._full_key(key), json.dumps(value), ex=ttl)
+
+    def ping(self) -> bool:
+        try:
+            return bool(self._redis.ping())
+        except Exception:
+            return False
 
 
 _CACHE_CLIENT: Optional[CacheClient] = None
 _CACHE_ENABLED: Optional[bool] = None
 
 
-def get_cache_client() -> CacheClient:
+def get_cache() -> CacheClient:
     """
     Lazily get a singleton CacheClient or raise CacheDisabled.
     """
@@ -87,7 +84,7 @@ def get_cache_client() -> CacheClient:
         return _CACHE_CLIENT
 
     try:
-        _CACHE_CLIENT = CacheClient.from_env()
+        _CACHE_CLIENT = CacheClient.create()
         _CACHE_ENABLED = True
         return _CACHE_CLIENT
     except CacheDisabled:
@@ -98,17 +95,58 @@ def get_cache_client() -> CacheClient:
         raise CacheDisabled("Cache unavailable (connection failure).")
 
 
-def build_exact_cache_key(payload: Dict[str, Any]) -> str:
+def make_cache_key(
+    *,
+    prompt: str,
+    provider: str,
+    model: str,
+    band: Optional[str],
+    extra: Optional[Dict[str, Any]] = None,
+) -> str:
     """
-    Deterministically build a SHA256-based cache key from a payload.
+    Hash prompt + routing parameters into a deterministic cache key.
     """
 
-    payload = dict(payload)
-    payload.pop("metadata", None)
-
+    payload: Dict[str, Any] = {
+        "prompt": prompt.strip(),
+        "provider": provider.lower(),
+        "model": model,
+    }
+    if band:
+        payload["band"] = band
+    if extra:
+        payload["extra"] = {k: _sanitize(extra[k]) for k in sorted(extra) if extra[k] is not None}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
     return f"exact:{digest}"
 
 
-__all__ = ["CacheClient", "CacheDisabled", "build_exact_cache_key", "get_cache_client"]
+def _sanitize(value: Any) -> Any:
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {k: _sanitize(v) for k, v in value.items() if v is not None}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize(v) for v in value]
+    try:
+        json.dumps(value)
+        return value
+    except TypeError:
+        return str(value)
+
+
+# Backwards compatibility helpers
+def get_cache_client() -> CacheClient:
+    return get_cache()
+
+
+def build_exact_cache_key(payload: Dict[str, Any]) -> str:
+    return make_cache_key(
+        prompt=payload.get("prompt", ""),
+        provider=str(payload.get("provider", "")),
+        model=str(payload.get("model", "")),
+        band=payload.get("band"),
+    )
+
+
+__all__ = ["CacheDisabled", "CacheClient", "get_cache", "get_cache_client", "make_cache_key"]

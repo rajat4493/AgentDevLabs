@@ -1,12 +1,22 @@
-import os
+import logging
 import time
 from typing import Any, Dict
 
 import requests
 
-OLLAMA_BASE = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2:7b-instruct")
+from ..config import settings
+from ..errors import (
+    ProviderInternalError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderValidationError,
+)
+from ..logging import configure_logger, log_event
+
+OLLAMA_BASE = settings.ollama_url.rstrip("/")
+DEFAULT_MODEL = settings.ollama_model
 TIMEOUT = 120  # seconds
+logger = configure_logger("lattice.providers.ollama")
 
 
 def _estimate_tokens(text: str) -> int:
@@ -37,17 +47,45 @@ def execute(plan: Dict[str, Any], prompt: str) -> Dict[str, Any]:
     start = time.time()
     try:
         resp = requests.post(f"{OLLAMA_BASE}/api/generate", json=payload, timeout=TIMEOUT)
-        resp.raise_for_status()
+    except requests.Timeout as exc:
+        log_event(logger, logging.WARNING, "provider_timeout", provider="ollama")
+        raise ProviderTimeoutError("Ollama did not respond in time.", provider="ollama") from exc
+    except requests.RequestException as exc:
+        log_event(logger, logging.ERROR, "provider_transport_error", provider="ollama")
+        raise ProviderInternalError("Failed to reach Ollama.", provider="ollama") from exc
+
+    if resp.status_code == 429:
+        log_event(logger, logging.WARNING, "provider_rate_limit", provider="ollama")
+        raise ProviderRateLimitError("Ollama rate limit exceeded.", provider="ollama")
+    if 400 <= resp.status_code < 500:
+        log_event(logger, logging.WARNING, "provider_validation_error", provider="ollama", status=resp.status_code)
+        raise ProviderValidationError("Ollama rejected the request.", provider="ollama")
+    if resp.status_code >= 500:
+        log_event(logger, logging.ERROR, "provider_internal_error", provider="ollama", status=resp.status_code)
+        raise ProviderInternalError("Ollama returned a server error.", provider="ollama")
+
+    try:
         data = resp.json()
-        output = data.get("response", "")
-    except requests.HTTPError as e:
-        output = f"[Ollama HTTP error] {e.response.status_code if e.response else 'unknown'}: {e}"
-    except requests.RequestException as e:
-        output = f"[Ollama error] {e}"
+    except ValueError as exc:
+        log_event(logger, logging.ERROR, "provider_malformed_response", provider="ollama")
+        raise ProviderInternalError("Ollama returned malformed JSON.", provider="ollama") from exc
+
+    output = data.get("response", "")
 
     latency_ms = int((time.time() - start) * 1000)
     tokens_in = _estimate_tokens(prompt)
     tokens_out = _estimate_tokens(output)
+
+    log_event(
+        logger,
+        logging.INFO,
+        "provider_success",
+        provider="ollama",
+        model=model,
+        latency_ms=latency_ms,
+        prompt_tokens=tokens_in,
+        completion_tokens=tokens_out,
+    )
 
     return {
         "output": output.strip(),

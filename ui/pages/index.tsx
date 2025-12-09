@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import LatticeShell from "@/components/LatticeShell";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ type MetricsResponse = {
   bands: Record<string, number>;
 };
 
-export default function HomePage() {
+function HomePage() {
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,6 +237,10 @@ print(result.text, result.cost["total_cost"], result.tags)`}
     </LatticeShell>
   );
 }
+
+export default dynamic(() => Promise.resolve(HomePage), {
+  ssr: false,
+});
 
 function MetricCard({
   label,

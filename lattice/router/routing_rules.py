@@ -8,10 +8,11 @@ to a provider/model combination.
 from __future__ import annotations
 
 import json
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Mapping, MutableMapping
+
+from ..config import settings
 
 RoutingRules = Dict[str, Dict[str, Dict[str, str]]]
 
@@ -32,11 +33,7 @@ SAFE_FALLBACK = {"provider": "openai", "model": "gpt-4o-mini", "band": "medium"}
 
 
 def _default_config_path() -> Path:
-    env_path = os.getenv("LATTICE_ROUTING_RULES_PATH")
-    if env_path:
-        return Path(env_path)
-    project_root = Path(__file__).resolve().parents[2]
-    return project_root / "config" / "routing_rules.json"
+    return Path(settings.routing_rules_path)
 
 
 def _load_rules_from_file(path: Path) -> RoutingRules:

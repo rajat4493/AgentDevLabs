@@ -4,19 +4,23 @@ Core service logic for Lattice /v1 endpoints.
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import HTTPException, status
 from pydantic import BaseModel, Field
 
-from .cache import CacheDisabled, build_exact_cache_key, get_cache_client
+from .cache import CacheDisabled, get_cache, make_cache_key
 from .cost import compute_costs
+from .errors import ConfigurationError, ProviderValidationError
+from .logging import configure_logger, log_event
 from .metrics import METRICS
 from .pii import detect_tags
 from .providers import PROVIDERS
 from .router.bands import find_provider_for_model, select_model_for_band
 from .router.complexity import choose_band, score_complexity
+
+logger = configure_logger("lattice.service")
 
 
 class CompleteRequest(BaseModel):
@@ -43,10 +47,6 @@ def _normalize_band(band: Optional[str]) -> Optional[str]:
     return mapping.get(band.lower(), band)
 
 
-def _build_cache_payload(response: Dict[str, Any]) -> Dict[str, Any]:
-    return {"response": response}
-
-
 def _choose_target(request: CompleteRequest, prompt: str) -> Dict[str, Any]:
     inferred_band = choose_band(score_complexity(prompt), prompt)
     requested_band = _normalize_band(request.band) or inferred_band
@@ -54,9 +54,9 @@ def _choose_target(request: CompleteRequest, prompt: str) -> Dict[str, Any]:
     if request.model:
         provider = (request.provider or find_provider_for_model(request.model) or "").lower()
         if not provider:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="provider must be specified when forcing a model",
+            raise ProviderValidationError(
+                "provider must be specified when forcing a model",
+                provider=request.provider,
             )
         return {
             "provider": provider,
@@ -65,9 +65,12 @@ def _choose_target(request: CompleteRequest, prompt: str) -> Dict[str, Any]:
             "routing_reason": "forced_model",
         }
 
-    provider, model, routing_reason = select_model_for_band(
-        band=requested_band, explicit_provider=request.provider
-    )
+    try:
+        provider, model, routing_reason = select_model_for_band(
+            band=requested_band, explicit_provider=request.provider
+        )
+    except ValueError as exc:
+        raise ConfigurationError(str(exc))
     return {
         "provider": provider,
         "model": model,
@@ -76,20 +79,10 @@ def _choose_target(request: CompleteRequest, prompt: str) -> Dict[str, Any]:
     }
 
 
-def _cache_fingerprint(request: CompleteRequest, band: Optional[str], prompt: str) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
-        "prompt": prompt,
-        "band": band,
-        "provider": (request.provider or "").lower() if request.provider else None,
-        "model": request.model,
-    }
-    return payload
-
-
 def complete(request: CompleteRequest) -> Dict[str, Any]:
     prompt = (request.prompt or "").strip()
     if not prompt:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="prompt is required")
+        raise ProviderValidationError("prompt is required")
 
     selection = _choose_target(request, prompt)
     provider_key: str = selection["provider"]
@@ -99,24 +92,25 @@ def complete(request: CompleteRequest) -> Dict[str, Any]:
 
     adapter = PROVIDERS.get(provider_key)
     if not adapter:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"provider '{provider_key}' unavailable"
-        )
+        raise ProviderValidationError(f"provider '{provider_key}' unavailable", provider=provider_key)
 
     cache_key: Optional[str] = None
+    cache_client = None
     cached_response: Optional[Dict[str, Any]] = None
-    cache_hit = False
     try:
-        fingerprint = _cache_fingerprint(request, resolved_band, prompt)
-        cache_key = build_exact_cache_key(fingerprint)
-        cached_entry = get_cache_client().get_json(cache_key)
-        if cached_entry and isinstance(cached_entry.get("response"), dict):
-            cached_response = cached_entry["response"]
-            cache_hit = True
+        cache_client = get_cache()
+        cache_key = make_cache_key(
+            prompt=prompt,
+            provider=provider_key,
+            model=model_name,
+            band=resolved_band,
+            extra=request.metadata or {},
+        )
+        cached_response = cache_client.get(cache_key)
     except CacheDisabled:
-        cache_key = None
+        cache_client = None
     except Exception:
-        cache_key = None
+        cache_client = None
 
     prompt_tags = detect_tags(prompt)
 
@@ -125,17 +119,28 @@ def complete(request: CompleteRequest) -> Dict[str, Any]:
         tags = sorted(set(prompt_tags + response_tags))
         result = dict(cached_response)
         result["tags"] = tags
-        METRICS.record_request(
+        latency_snapshot = int(result.get("latency_ms", 0) or 0)
+        METRICS.increment_cache_hit()
+        METRICS.increment_requests(
             provider=provider_key,
             model=model_name,
             band=resolved_band,
-            latency_ms=result.get("latency_ms", 0) or 0,
-            input_tokens=result.get("usage", {}).get("input_tokens", 0),
-            output_tokens=result.get("usage", {}).get("output_tokens", 0),
-            total_cost=result.get("cost", {}).get("total_cost", 0.0),
-            cache_hit=True,
-            tags=tags,
-            count_usage=False,
+            latency_ms=latency_snapshot,
+            input_tokens=0,
+            output_tokens=0,
+            total_cost=0.0,
+            pii_tags_count=len(tags),
+        )
+        log_event(
+            logger,
+            logging.INFO,
+            "completion_cache_hit",
+            provider=provider_key,
+            model=model_name,
+            band=resolved_band,
+            latency_ms=latency_snapshot,
+            cache="hit",
+            piitag=len(tags),
         )
         return result
 
@@ -173,16 +178,14 @@ def complete(request: CompleteRequest) -> Dict[str, Any]:
         "tags": tags,
     }
 
-    if cache_key:
+    if cache_key and cache_client:
         try:
-            client = get_cache_client()
-            client.set_json(cache_key, _build_cache_payload(response_payload))
-        except CacheDisabled:
-            pass
+            cache_client.set(cache_key, response_payload)
         except Exception:
             pass
 
-    METRICS.record_request(
+    METRICS.increment_cache_miss()
+    METRICS.increment_requests(
         provider=provider_key,
         model=model_name,
         band=resolved_band,
@@ -190,9 +193,19 @@ def complete(request: CompleteRequest) -> Dict[str, Any]:
         input_tokens=prompt_tokens,
         output_tokens=completion_tokens,
         total_cost=cost.total_cost,
-        cache_hit=False,
-        tags=tags,
-        count_usage=True,
+        pii_tags_count=len(tags),
+    )
+    log_event(
+        logger,
+        logging.INFO,
+        "completion_success",
+        provider=provider_key,
+        model=model_name,
+        band=resolved_band,
+        latency_ms=latency_ms,
+        total_cost=cost.total_cost,
+        cache="miss",
+        piitag=len(tags),
     )
 
     return response_payload

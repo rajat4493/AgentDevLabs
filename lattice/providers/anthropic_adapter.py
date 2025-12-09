@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import logging
 import time
 from typing import Any, Dict, List
 
@@ -11,12 +11,31 @@ except ImportError:  # pragma: no cover - optional dependency
     anthropic = None  # type: ignore
     Anthropic = None  # type: ignore
 
+if anthropic is not None:  # pragma: no cover - type guard
+    AnthropicRateLimitError = getattr(anthropic, "RateLimitError", Exception)
+    AnthropicAPITimeoutError = getattr(anthropic, "APITimeoutError", Exception)
+    AnthropicAPIStatusError = getattr(anthropic, "APIStatusError", Exception)
+    AnthropicAPIError = getattr(anthropic, "APIError", Exception)
+else:  # pragma: no cover
+    AnthropicRateLimitError = Exception
+    AnthropicAPITimeoutError = Exception
+    AnthropicAPIStatusError = Exception
+    AnthropicAPIError = Exception
+
+from ..config import settings
+from ..errors import (
+    ConfigurationError,
+    ProviderInternalError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderValidationError,
+)
+from ..logging import configure_logger, log_event
+
+logger = configure_logger("lattice.providers.anthropic")
+
 DEFAULT_MODEL = "claude-3-sonnet-20240229"
 DEFAULT_MAX_TOKENS = 1024
-DEFAULT_SYS_PROMPT = os.getenv(
-    "ANTHROPIC_SYSTEM_PROMPT",
-    "You are a concise, high-signal assistant for lattice routed requests.",
-)
 
 ANTHROPIC_PRICING: Dict[str, Dict[str, float]] = {
     # USD cost per single token
@@ -49,11 +68,11 @@ class AnthropicProvider:
 
     def _ensure_client(self) -> Anthropic:
         if Anthropic is None:
-            raise RuntimeError("anthropic package is not installed. Add it to requirements.")
+            raise ConfigurationError("anthropic package is not installed. Add it to requirements.", provider="anthropic")
         if self._client is None:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
+            api_key = settings.anthropic_api_key
             if not api_key:
-                raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+                raise ConfigurationError("ANTHROPIC_API_KEY is not configured", provider="anthropic")
             self._client = Anthropic(api_key=api_key)
         return self._client
 
@@ -82,7 +101,7 @@ class AnthropicProvider:
         if not isinstance(max_tokens, int) or max_tokens <= 0:
             max_tokens = DEFAULT_MAX_TOKENS
 
-        system_prompt = params.get("system_prompt") or DEFAULT_SYS_PROMPT
+        system_prompt = params.get("system_prompt") or settings.anthropic_system_prompt
 
         return {
             "target": {"provider": "anthropic", "model": model_name},
@@ -101,7 +120,7 @@ class AnthropicProvider:
         model = _resolve_model_name(requested_model)
         max_tokens = int(params.get("max_tokens") or DEFAULT_MAX_TOKENS)
         temperature = float(params.get("temperature", 0.2))
-        system_prompt = params.get("system_prompt") or DEFAULT_SYS_PROMPT
+        system_prompt = params.get("system_prompt") or settings.anthropic_system_prompt
 
         payload_messages = [{"role": "user", "content": prompt}]
         latency_ms = 0.0
@@ -109,23 +128,32 @@ class AnthropicProvider:
         completion_tokens = 0
         text_output = ""
 
-        try:
-            resp = self.chat(
-                model=model,
-                messages=payload_messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-            )
-            text_output = resp["content"].strip()
-            latency_ms = resp["latency_ms"]
-            usage = resp.get("usage") or {}
-            prompt_tokens = int(usage.get("prompt_tokens", 0))
-            completion_tokens = int(usage.get("completion_tokens", 0))
-        except Exception as exc:  # pragma: no cover - safety net
-            text_output = f"[Anthropic error] {exc}"
+        resp = self.chat(
+            model=model,
+            messages=payload_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
+        )
+        text_output = resp["content"].strip()
+        latency_ms = resp["latency_ms"]
+        usage = resp.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
 
         cost_usd = _estimate_cost(model, prompt_tokens, completion_tokens)
+
+        log_event(
+            logger,
+            logging.INFO,
+            "provider_success",
+            provider="anthropic",
+            model=model,
+            latency_ms=int(latency_ms),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost_usd,
+        )
 
         return {
             "output": text_output,
@@ -164,7 +192,27 @@ class AnthropicProvider:
             kwargs["system"] = system
 
         t0 = time.perf_counter()
-        resp = client.messages.create(**kwargs)
+        try:
+            resp = client.messages.create(**kwargs)
+        except AnthropicRateLimitError as exc:
+            log_event(logger, logging.WARNING, "provider_rate_limit", provider="anthropic")
+            raise ProviderRateLimitError("Anthropic rate limit exceeded.", provider="anthropic") from exc
+        except AnthropicAPITimeoutError as exc:
+            log_event(logger, logging.WARNING, "provider_timeout", provider="anthropic")
+            raise ProviderTimeoutError("Anthropic did not respond in time.", provider="anthropic") from exc
+        except AnthropicAPIStatusError as exc:
+            status_code = getattr(exc, "status_code", 500)
+            if 400 <= status_code < 500:
+                log_event(logger, logging.WARNING, "provider_validation_error", provider="anthropic", status=status_code)
+                raise ProviderValidationError("Anthropic rejected the request.", provider="anthropic") from exc
+            log_event(logger, logging.ERROR, "provider_internal_error", provider="anthropic", status=status_code)
+            raise ProviderInternalError("Anthropic upstream error.", provider="anthropic") from exc
+        except AnthropicAPIError as exc:
+            log_event(logger, logging.ERROR, "provider_api_error", provider="anthropic")
+            raise ProviderInternalError("Anthropic API error.", provider="anthropic") from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            log_event(logger, logging.ERROR, "provider_internal_error", provider="anthropic")
+            raise ProviderInternalError("Anthropic call failed.", provider="anthropic") from exc
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
         content_blocks = resp.content or []

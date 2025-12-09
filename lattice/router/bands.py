@@ -5,11 +5,12 @@ Band configuration helpers for routing decisions.
 from __future__ import annotations
 
 import json
-import os
 import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from ..config import settings
 
 
 @dataclass(frozen=True)
@@ -89,9 +90,7 @@ def get_bands_registry() -> BandsRegistry:
     if _BANDS_REGISTRY is not None:
         return _BANDS_REGISTRY
 
-    default_path = Path(__file__).parent.parent / "data" / "bands.json"
-    path_str = os.getenv("LATTICE_BANDS_FILE", str(default_path))
-    _BANDS_REGISTRY = BandsRegistry.from_file(path_str)
+    _BANDS_REGISTRY = BandsRegistry.from_file(settings.bands_config_path)
     return _BANDS_REGISTRY
 
 

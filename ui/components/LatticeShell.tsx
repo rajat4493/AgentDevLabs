@@ -13,7 +13,7 @@ type ShellProps = {
 
 const NAV_LINKS: Array<{ label: string; icon: string; href?: string }> = [
   { label: "Overview", icon: "●", href: "/" },
-  { label: "Playground", icon: "▶" },
+  { label: "Playground", icon: "▶", href: "/playground" },
   { label: "Metrics", icon: "✦", href: "/traces" },
   { label: "Stats", icon: "▣", href: "/stats" },
   { label: "Settings", icon: "⚙" },

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import logging
 import time
 from typing import Any, Dict, List
 
@@ -8,6 +8,18 @@ try:  # pragma: no cover - optional dependency
     import google.generativeai as genai
 except ImportError:  # pragma: no cover - optional dependency
     genai = None  # type: ignore
+
+from ..config import settings
+from ..errors import (
+    ConfigurationError,
+    ProviderInternalError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderValidationError,
+)
+from ..logging import configure_logger, log_event
+
+logger = configure_logger("lattice.providers.gemini")
 
 DEFAULT_MODEL = "gemini-2.0-flash"
 DEFAULT_MAX_TOKENS = 1024
@@ -33,11 +45,11 @@ class GeminiProvider:
 
     def _ensure_configured(self) -> None:
         if genai is None:
-            raise RuntimeError("google-generativeai is not installed. Add it to requirements.")
+            raise ConfigurationError("google-generativeai is not installed. Add it to requirements.", provider="gemini")
         if not self._configured:
-            api_key = os.getenv("GEMINI_API_KEY")
+            api_key = settings.gemini_api_key
             if not api_key:
-                raise RuntimeError("GEMINI_API_KEY is not configured")
+                raise ConfigurationError("GEMINI_API_KEY is not configured", provider="gemini")
             genai.configure(api_key=api_key)
             self._configured = True
 
@@ -80,27 +92,31 @@ class GeminiProvider:
         max_tokens = int(params.get("max_tokens") or DEFAULT_MAX_TOKENS)
         temperature = float(params.get("temperature", 0.3))
 
-        latency_ms = 0.0
-        prompt_tokens = 0
-        completion_tokens = 0
-        text_output = ""
-
-        try:
-            resp = self.chat(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            text_output = resp["content"].strip()
-            latency_ms = resp["latency_ms"]
-            usage = resp.get("usage") or {}
-            prompt_tokens = int(usage.get("prompt_tokens", 0))
-            completion_tokens = int(usage.get("completion_tokens", 0))
-        except Exception as exc:  # pragma: no cover - safety net
-            text_output = f"[Gemini error] {exc}"
+        resp = self.chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        text_output = resp["content"].strip()
+        latency_ms = resp["latency_ms"]
+        usage = resp.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
 
         cost_usd = _estimate_cost(model, prompt_tokens, completion_tokens)
+
+        log_event(
+            logger,
+            logging.INFO,
+            "provider_success",
+            provider="gemini",
+            model=model,
+            latency_ms=resp["latency_ms"],
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost_usd,
+        )
 
         return {
             "output": text_output,
@@ -137,10 +153,29 @@ class GeminiProvider:
         gen_model = genai.GenerativeModel(model)
 
         t0 = time.perf_counter()
-        resp = gen_model.generate_content(
-            user_text,
-            generation_config=generation_config,
-        )
+        try:
+            resp = gen_model.generate_content(
+                user_text,
+                generation_config=generation_config,
+            )
+        except Exception as exc:  # pragma: no cover - upstream errors
+            status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+            try:
+                status_int = int(status_code) if status_code is not None else None
+            except (TypeError, ValueError):
+                status_int = None
+            message = str(exc).lower()
+            if status_int == 429:
+                log_event(logger, logging.WARNING, "provider_rate_limit", provider="gemini")
+                raise ProviderRateLimitError("Gemini rate limit exceeded.", provider="gemini") from exc
+            if status_int is not None and 400 <= status_int < 500:
+                log_event(logger, logging.WARNING, "provider_validation_error", provider="gemini", status=status_int)
+                raise ProviderValidationError("Gemini rejected the request.", provider="gemini") from exc
+            if "timeout" in message:
+                log_event(logger, logging.WARNING, "provider_timeout", provider="gemini")
+                raise ProviderTimeoutError("Gemini request timed out.", provider="gemini") from exc
+            log_event(logger, logging.ERROR, "provider_internal_error", provider="gemini")
+            raise ProviderInternalError("Gemini call failed.", provider="gemini") from exc
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
         text = getattr(resp, "text", "") or ""
