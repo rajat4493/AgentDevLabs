@@ -53,7 +53,7 @@ ui/            # Legacy Next.js dashboard (optional; /dashboard HTML is built in
 
 | Endpoint | Description |
 | --- | --- |
-| `POST /v1/complete` | Routes a prompt, enforces band/model, TTL cache, computes cost + tags. Returns `{text, usage, cost, latency_ms, band, routing_reason, tags}`. |
+| `POST /v1/complete` | Routes a prompt, applies cache + metrics, computes cost & tags. Returns `{text, usage, cost, latency_ms, band, tags, routing}`. |
 | `GET /v1/metrics` | Returns aggregated metrics only (no per-request rows). |
 | `GET /v1/health` | `{ "status": "ok" }` heartbeat. |
 | `GET /v1/ready` | Checks cache/provider readiness; 503 when dependencies fail. |
@@ -74,6 +74,8 @@ ui/            # Legacy Next.js dashboard (optional; /dashboard HTML is built in
 | `LATTICE_RATE_LIMIT_ENABLED` | Enable per-key/IP rate limiting | `0` |
 | `LATTICE_RATE_LIMIT_PER_DAY` | Requests per 24h window when enabled | `1000` |
 | `REDIS_URL` | Cache + rate limit backend | `redis://localhost:6379/0` |
+| `LATTICE_CLOUD_INGEST_KEY` | Optional AgentRouter ingest API key | _unset_ |
+| `LATTICE_CLOUD_INGEST_URL` | Destination for metadata ingestion | `https://agentrouter.ai/api/ingest` |
 
 ## Invariants enforced in code
 
@@ -86,7 +88,7 @@ ui/            # Legacy Next.js dashboard (optional; /dashboard HTML is built in
 - `lattice/router/bands.py` and `lattice/router/complexity.py` keep the original RAJOS routing heuristics but without tenanting/ALRI baggage.
 - `lattice/cache.py` reuses the Redis helper with hashed keys + short TTLs.
 - `lattice/providers/` contains adapters for OpenAI, Anthropic, Gemini, Ollama, and a stub echo model.
-- `lattice/service.complete()` orchestrates routing, caching, provider calls, cost calculation, tagging, and metrics.
+- `lattice/router/completion.route_completion()` orchestrates routing, caching, provider calls, cost calculation, tagging, and metrics (the legacy `lattice.service.complete` now wraps it).
 
 ## SDK recap
 

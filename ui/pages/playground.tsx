@@ -12,18 +12,24 @@ type CompletionPayload = {
   cost?: Record<string, number>;
   tags?: string[];
   band?: string;
-  routing_reason?: string;
+  routing?: {
+    reason?: string;
+    candidates?: { provider: string; model: string }[];
+    chosen?: { provider: string; model: string };
+  };
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
+    total_tokens?: number;
   };
 };
 
 function PlaygroundPage() {
   const [prompt, setPrompt] = useState("");
   const [band, setBand] = useState("low");
-  const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  const [maxTokens, setMaxTokens] = useState("");
+  const [temperature, setTemperature] = useState("");
   const [metadata, setMetadata] = useState("{}");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,19 +52,48 @@ function PlaygroundPage() {
       }
     }
 
+    let parsedMaxTokens: number | undefined;
+    if (maxTokens.trim()) {
+      const value = Number(maxTokens);
+      if (!Number.isFinite(value) || value <= 0) {
+        setError("Max tokens must be a positive number.");
+        setLoading(false);
+        return;
+      }
+      parsedMaxTokens = Math.floor(value);
+    }
+
+    let parsedTemperature: number | undefined;
+    if (temperature.trim()) {
+      const value = Number(temperature);
+      if (!Number.isFinite(value) || value < 0 || value > 2) {
+        setError("Temperature must be between 0 and 2.");
+        setLoading(false);
+        return;
+      }
+      parsedTemperature = value;
+    }
+
     try {
+      const bodyPayload: Record<string, unknown> = {
+        prompt,
+        band: band || undefined,
+        model: model || undefined,
+        metadata: metadataPayload,
+      };
+      if (parsedMaxTokens !== undefined) {
+        bodyPayload.max_tokens = parsedMaxTokens;
+      }
+      if (parsedTemperature !== undefined) {
+        bodyPayload.temperature = parsedTemperature;
+      }
+
       const resp = await fetch(`${API_BASE}/v1/complete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          prompt,
-          band: band || undefined,
-          provider: provider || undefined,
-          model: model || undefined,
-          metadata: metadataPayload,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (!resp.ok) {
@@ -83,7 +118,15 @@ function PlaygroundPage() {
       actions={
         <button
           type="button"
-          onClick={() => setPrompt("")}
+          onClick={() => {
+            setPrompt("");
+            setModel("");
+            setMetadata("{}");
+            setMaxTokens("");
+            setTemperature("");
+            setResult(null);
+            setError(null);
+          }}
           className="rounded-xl border border-slate-700/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-emerald-500"
         >
           Clear
@@ -123,13 +166,15 @@ function PlaygroundPage() {
             </div>
             <div>
               <label className="block text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400 mb-2">
-                Provider (optional)
+                Max tokens (optional)
               </label>
               <input
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
+                value={maxTokens}
+                onChange={(event) => setMaxTokens(event.target.value)}
+                type="number"
+                min={1}
                 className="w-full rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
-                placeholder="openai, anthropic…"
+                placeholder="512"
               />
             </div>
           </div>
@@ -148,13 +193,30 @@ function PlaygroundPage() {
             </div>
             <div>
               <label className="block text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400 mb-2">
-                Metadata (JSON)
+                Temperature (0-2)
               </label>
-              <textarea
-                value={metadata}
-                onChange={(event) => setMetadata(event.target.value)}
+              <input
+                value={temperature}
+                onChange={(event) => setTemperature(event.target.value)}
+                type="number"
+                min={0}
+                max={2}
+                step="0.1"
                 className="w-full rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
-                rows={3}
+                placeholder="0.2"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400 mb-2">
+              Metadata (JSON)
+            </label>
+            <textarea
+              value={metadata}
+              onChange={(event) => setMetadata(event.target.value)}
+              className="w-full rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/40 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+              rows={3}
               />
             </div>
           </div>
@@ -188,7 +250,9 @@ function PlaygroundPage() {
                 <span>Latency: {result.latency_ms ?? 0} ms</span>
                 <span>Cost: ${result.cost?.total_cost ?? 0}</span>
                 <span>Band: {result.band || "—"}</span>
+                <span>Routing: {result.routing?.reason || "—"}</span>
                 <span>Tags: {result.tags?.join(", ") || "None"}</span>
+                <span>Tokens (in/out/total): {result.usage?.input_tokens ?? 0} / {result.usage?.output_tokens ?? 0} / {result.usage?.total_tokens ?? 0}</span>
               </div>
             </div>
           )}

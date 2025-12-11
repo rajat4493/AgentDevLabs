@@ -100,6 +100,11 @@ class Settings(_BaseSettings):
         default=str(DEFAULT_DATA_DIR / "routing_rules.json"),
         alias="LATTICE_ROUTING_RULES_PATH",
     )
+    cloud_ingest_key: Optional[str] = Field(default=None, alias="LATTICE_CLOUD_INGEST_KEY")
+    cloud_ingest_url: str = Field(
+        default="https://agentrouter.ai/api/ingest",
+        alias="LATTICE_CLOUD_INGEST_URL",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

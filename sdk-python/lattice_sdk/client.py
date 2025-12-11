@@ -7,7 +7,7 @@ Example:
 
     client = LatticeClient()
     result = client.complete("hello lattice!")
-    print(result.text, result.cost["total_cost"])
+    print(result.text, result.cost["total_cost"], result.routing["reason"])
 """
 
 from __future__ import annotations
@@ -29,8 +29,13 @@ class CompleteResult:
     cost: Dict[str, Any]
     latency_ms: float
     band: Optional[str] = None
-    routing_reason: Optional[str] = None
     tags: List[str] | None = None
+    routing: Optional[Dict[str, Any]] = None
+    routing_reason: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.routing_reason is None and self.routing:
+            self.routing_reason = self.routing.get("reason")
 
 
 class LatticeAPIError(Exception):
@@ -108,21 +113,36 @@ class LatticeClient:
         self,
         prompt: str,
         band: Optional[str] = None,
-        provider: Optional[str] = None,
         model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> CompleteResult:
+        """
+        Route a prompt through the local Lattice router and return structured metadata.
+
+        Example:
+            client = LatticeClient()
+            res = client.complete("Explain quantum computing like I'm five", band="low")
+            print(res.text, res.cost["total_cost"], res.routing["reason"])
+        """
+
         if not isinstance(prompt, str) or not prompt.strip():
             raise ValueError("prompt must be a non-empty string")
 
-        payload = {
+        payload: Dict[str, Any] = {
             "prompt": prompt,
             "band": band,
-            "provider": provider,
             "model": model,
-            "metadata": metadata or {},
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+        payload["metadata"] = metadata if metadata is not None else None
+
         data = self._request_with_retries(payload)
+        routing = data.get("routing")
 
         return CompleteResult(
             text=data["text"],
@@ -132,8 +152,9 @@ class LatticeClient:
             cost=data.get("cost", {}),
             latency_ms=data.get("latency_ms", 0.0),
             band=data.get("band"),
-            routing_reason=data.get("routing_reason"),
             tags=data.get("tags"),
+            routing=routing,
+            routing_reason=(routing or {}).get("reason"),
         )
 
 

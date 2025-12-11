@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+import time
 
 from .cache import CacheDisabled, get_cache
 from .config import settings
@@ -27,7 +28,8 @@ from .errors import (
 from .logging import configure_logger
 from .metrics import METRICS
 from .rate_limit import rate_limiter
-from .service import CompleteRequest, complete
+from .router.completion import route_completion
+from .schemas import CompletionRequest, CompletionResponse
 logger = configure_logger("lattice.api")
 
 app = FastAPI(
@@ -145,13 +147,25 @@ async def handle_request_validation(request: Request, exc: RequestValidationErro
     )
 
 
-@app.post("/v1/complete")
-def post_complete(payload: CompleteRequest, _: None = Depends(enforce_rate_limit)):
+@app.post("/v1/complete", response_model=CompletionResponse)
+async def post_complete(
+    payload: CompletionRequest,
+    request: Request,
+    _: None = Depends(enforce_rate_limit),
+):
     """
     Route a prompt to the configured band/provider without persisting raw text.
     """
 
-    return complete(payload)
+    start = time.perf_counter()
+    response = await route_completion(payload)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    client_host = getattr(request.client, "host", "unknown") if request.client else "unknown"
+    logger.debug(
+        "request_complete",
+        extra={"latency_ms": round(elapsed_ms, 2), "client": client_host},
+    )
+    return response
 
 
 @app.get("/v1/metrics")

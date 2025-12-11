@@ -95,44 +95,18 @@ def get_cache() -> CacheClient:
         raise CacheDisabled("Cache unavailable (connection failure).")
 
 
-def make_cache_key(
-    *,
-    prompt: str,
-    provider: str,
-    model: str,
-    band: Optional[str],
-    extra: Optional[Dict[str, Any]] = None,
-) -> str:
-    """
-    Hash prompt + routing parameters into a deterministic cache key.
-    """
+def make_cache_key(prompt: str, provider: Optional[str], model: Optional[str], band: Optional[str]) -> str:
+    """Hash prompt + routing parameters into a deterministic cache key."""
 
     payload: Dict[str, Any] = {
         "prompt": prompt.strip(),
-        "provider": provider.lower(),
+        "provider": (provider or "").lower(),
         "model": model,
+        "band": band,
     }
-    if band:
-        payload["band"] = band
-    if extra:
-        payload["extra"] = {k: _sanitize(extra[k]) for k in sorted(extra) if extra[k] is not None}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
     return f"exact:{digest}"
-
-
-def _sanitize(value: Any) -> Any:
-    if isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {k: _sanitize(v) for k, v in value.items() if v is not None}
-    if isinstance(value, (list, tuple)):
-        return [_sanitize(v) for v in value]
-    try:
-        json.dumps(value)
-        return value
-    except TypeError:
-        return str(value)
 
 
 # Backwards compatibility helpers
@@ -143,8 +117,8 @@ def get_cache_client() -> CacheClient:
 def build_exact_cache_key(payload: Dict[str, Any]) -> str:
     return make_cache_key(
         prompt=payload.get("prompt", ""),
-        provider=str(payload.get("provider", "")),
-        model=str(payload.get("model", "")),
+        provider=payload.get("provider"),
+        model=payload.get("model"),
         band=payload.get("band"),
     )
 

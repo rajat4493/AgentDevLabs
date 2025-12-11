@@ -20,3 +20,8 @@ def evaluate_policy(confidence: float, threshold: float = 0.7) -> Dict[str, Any]
         "hil_triggered": hil,
         "violations": [] if not hil else ["confidence_below_threshold"],
     }
+
+
+from .completion import route_completion
+
+__all__ = ["new_run_id", "compute_alri_tag", "evaluate_policy", "route_completion"]
